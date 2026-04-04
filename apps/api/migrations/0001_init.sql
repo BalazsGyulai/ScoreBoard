@@ -30,9 +30,9 @@ CREATE TABLE users (
     username   TEXT        NOT NULL,
     pass_hash  TEXT        NOT NULL,  -- bcrypt hash
     role       membership  NOT NULL DEFAULT 'member',
-    email      TEXT,
+    email      TEXT        NOT NULL UNIQUE,  -- login credential, globally unique
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE (group_id, username)       -- usernames are unique within a group
+    UNIQUE (group_id, username)              -- display names are unique within a group
 );
 
 -- ─── Games ────────────────────────────────────────────────────────────────────
