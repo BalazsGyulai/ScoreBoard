@@ -1,36 +1,116 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
-
-## Getting Started
-
-First, run the development server:
-
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# Folder Sturcture
+```
+homegame/
+├── .github/
+│   └── workflows/
+│       ├── ci.yml             # runs tests on every PR
+│       └── deploy.yml         # deploys to VPS on merge to main
+│
+├── apps/
+│   ├── web/                   # Next.js frontend
+│   └── api/                   # Rust backend
+│
+├── packages/
+│   └── proto/                 # shared .proto files for gRPC
+│       └── homegame.proto
+│
+├── infra/
+│   ├── docker-compose.yml     # local dev
+│   ├── docker-compose.prod.yml
+│   └── nginx/
+│       └── nginx.conf
+│
+├── scripts/
+│   └── seed.sql               # local dev seed data
+│
+└── README.md
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+# App Structure
+```
+apps/web/
+├── app/                         # App Router (Next.js 14+)
+│   ├── layout.tsx               # root layout: fonts, global providers
+│   ├── page.tsx                 # / redirects to /dashboard or /login
+│   │
+│   ├── (auth)/                  # route group — no shared layout with app
+│   │   ├── login/
+│   │   │   └── page.tsx
+│   │   └── register/
+│   │       └── page.tsx
+│   │
+│   ├── (app)/                   # route group — authenticated shell
+│   │   ├── layout.tsx           # sidebar Nav + session guard
+│   │   ├── dashboard/
+│   │   │   └── page.tsx         # Winner/Stats page
+│   │   ├── games/
+│   │   │   ├── page.tsx         # list of custom games
+│   │   │   ├── new/
+│   │   │   │   └── page.tsx     # AddGame
+│   │   │   └── [gameName]/
+│   │   │       ├── page.tsx     # CustomGame (scoring view)
+│   │   │       └── log/
+│   │   │           └── page.tsx # CustomGameLog
+│   │   ├── players/
+│   │   │   ├── page.tsx         # player list (Add player)
+│   │   │   └── [id]/
+│   │   │       └── page.tsx     # PlayerInfo
+│   │   └── settings/
+│   │       └── page.tsx
+│   │
+│   └── (viewer)/                # read-only route group for viewer tokens
+│       └── live/
+│           └── [gameCode]/
+│               └── page.tsx     # public live scoreboard (TV view)
+│
+├── components/
+│   ├── ui/                      # generic building blocks (no business logic)
+│   │   ├── button.tsx
+│   │   ├── input.tsx
+│   │   ├── skeleton.tsx         # reusable skeleton block
+│   │   └── chart.tsx
+│   │
+│   ├── game/                    # feature-scoped components
+│   │   ├── player-card.tsx
+│   │   ├── player-card-skeleton.tsx
+│   │   ├── score-input.tsx
+│   │   └── live-scoreboard.tsx  # SSE consumer
+│   │
+│   ├── stats/
+│   │   ├── bar-chart.tsx
+│   │   ├── win-rate-grid.tsx
+│   │   └── year-filter.tsx
+│   │
+│   └── nav/
+│       ├── sidebar.tsx
+│       └── nav-item.tsx
+│
+├── lib/
+│   ├── api/                     # typed fetch wrappers (called from Server Components)
+│   │   ├── games.ts
+│   │   ├── players.ts
+│   │   ├── stats.ts
+│   │   └── auth.ts
+│   ├── auth/
+│   │   ├── session.ts           # iron-session or next-auth helpers
+│   │   └── middleware.ts        # route protection
+│   └── utils.ts
+│
+├── hooks/                       # client-side hooks only
+│   ├── use-sse.ts               # SSE subscription hook
+│   └── use-optimistic-score.ts  # optimistic UI for score entry
+│
+├── types/
+│   ├── api.ts                   # response shapes from Rust API
+│   └── domain.ts                # Player, Game, Score, etc.
+│
+├── middleware.ts                # Next.js edge middleware for auth
+│
+├── __tests__/
+│   ├── components/
+│   └── lib/
+│
+├── next.config.ts
+├── tailwind.config.ts
+└── vitest.config.ts
+```

@@ -1,46 +1,7 @@
 {
-  "compilerOptions": {
-    "target": "ES2017",
-    "lib": [
-      "dom",
-      "dom.iterable",
-      "esnext"
-    ],
-    "allowJs": true,
-    "skipLibCheck": true,
-    "strict": true,
-    "noEmit": true,
-    "esModuleInterop": true,
-    "module": "esnext",
-    "moduleResolution": "bundler",
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "jsx": "react-jsx",
-    "incremental": true,
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ],
-    "paths": {
-      "@/*": [
-        "./*"
-      ]
-    }
-  },
-  "include": [
-    "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
-    ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts",
-    "**/*.mts",
-    "apps/web/signup/page.js",
-    "apps/web/login/page.js",
-    "apps/web/page.js",
-    "apps/web/_components/input.js"
-  ],
-  "exclude": [
-    "node_modules"
+  "$comment": "Root tsconfig — only here for editor support across the whole monorepo. Each app has its own tsconfig.json. Do NOT add app-specific paths here.",
+  "files": [],
+  "references": [
+    { "path": "./apps/web" }
   ]
 }
