@@ -15,7 +15,7 @@ export default function Login() {
                 <div className={loginStyles.field}>
                     <Label htmlFor="email" text='Email:'/>
                     <Input
-                        type="text"
+                        type="email"
                         name="email"
                         // value={username}
                         // onChange={nameChangeHandler}

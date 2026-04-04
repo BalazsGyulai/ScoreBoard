@@ -6,6 +6,9 @@
   --text-primary: #fca311;
   --text-secondary: #14213d;
   --disabled: #ccc;
+  --error: #FF5963;
+  --success: #249689;
+  --warning: #f9cf58;
 }
 
 @theme inline {

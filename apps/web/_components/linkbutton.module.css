@@ -1,4 +1,7 @@
-
+.link{
+    width: 100%;
+  
+}
 
 .button {
     display: flex;
@@ -9,8 +12,8 @@
     border: none;
     border-radius: 9px;
     outline: none;
-    cursor: pointer;
     padding: 10px;
+    cursor: pointer;
 }
 
 .disabled {
@@ -19,4 +22,8 @@
 
 .text {
     padding: 0 10px;
+}
+
+.enabled {
+    background-color: var(--text-primary);
 }
