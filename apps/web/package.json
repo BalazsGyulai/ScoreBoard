@@ -6,7 +6,9 @@
     "dev": "NODE_OPTIONS='--localstorage-file=/tmp/homegame-dev-ls.json' next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "vitest",
+    "test:run": "vitest run"
   },
   "dependencies": {
     "next": "^15.5.14",
@@ -14,11 +16,16 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^6.0.1",
     "eslint": "^9",
     "eslint-config-next": "15.3.0",
-    "typescript": "^5"
+    "jsdom": "^29.0.1",
+    "typescript": "^5",
+    "vitest": "^4.1.2"
   }
 }

@@ -1,22 +1,5 @@
-mod auth;
-mod config;
-mod db;
-mod games;
-mod players;
-mod router;
-mod scores;
-mod sse;
-mod stats;
-
-use config::Config;
-use db::pool::create_pool;
-
-// AppState - each field is an Arc internally
-#[derive(Clone)]
-pub struct AppState {
-    pub db: sqlx::PgPool,
-    pub config: Config,
-}
+use api::{config::Config, router, AppState};
+use api::db::pool::create_pool;
 
 #[tokio::main]
 async fn main() {
