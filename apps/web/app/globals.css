@@ -18,7 +18,7 @@
    --orange: #F59E0B;
    --orange-lt: #FEF3C7;
    --orange-dk: #D97706;
-   --succes-lt: #D1FAE5;
+   --success-lt: #D1FAE5;
    --danger-lt: #FEE2E2;
    --ease: cubic-bezier(0.4, 0, 0.2, 1);
    --spring: cubic-bezier(0.22, 1, 0.36, 1);
@@ -41,4 +41,25 @@
    background: var(--bg);
    color: var(--slate-900);
    -webkit-font-smoothing: antialiased;
+ }
+
+ h1 {
+   font-family: 'Bricolage Grotesque', sans-serif;
+   font-size: 27px;
+   font-weight: 700;
+   letter-spacing: -0.03em;
+ }
+
+ h2 {
+   font-family: 'Bricolage Grotesque', sans-serif;
+   font-size: 17px;
+   font-weight: 600;
+   letter-spacing: -0.02em;
+ }
+
+ h3 {
+   font-family: 'Bricolage Grotesque', sans-serif;
+   font-size: 14px;
+   font-weight: 600;
+   letter-spacing: -0.01em;
  }
