@@ -1,10 +1,16 @@
+'use client';
+
 import Button from "./button"
 import styles from "./navigation.module.css"
 import { Settings, Plus } from "lucide-react"
 import NavItem from "./navItem"
 import SidebarSettins from "./sidebarSettings"
+import { useState } from "react";
 
 export default function Navigation() {
+    const [isSettingsOpen, setSettingsOpen] = useState(false);
+    const [activePage, setActivePage] = useState("dashboard")
+
     return (
         <>
             <nav className={styles["nav-wrap"]}>
@@ -13,13 +19,14 @@ export default function Navigation() {
                         className={styles["nav-btn-gear"]}
                         title="Beállítások"
                         icon={<Settings size={14} />}
+                        onClick={() => setSettingsOpen(true)}
                     />
 
                     <div className={styles["nav-sep"]}></div>
 
-                    <NavItem title="Dashboard" active={true} />
-                    <NavItem title="Játékok" />
-                    <NavItem title="Statisztika" />
+                    <NavItem title="Dashboard" active={activePage === "dashboard"} onClick={() => setActivePage("dashboard")} />
+                    <NavItem title="Játékok" active={activePage === "games"} onClick={() => setActivePage("games")}/>
+                    <NavItem title="Statisztika" active={activePage === "statistics"} onClick={() => setActivePage("statistics")}/>
 
                     <div className={styles["nav-sep"]}></div>
 
@@ -31,7 +38,7 @@ export default function Navigation() {
                 </div>
             </nav>
 
-            <SidebarSettins />
+            {isSettingsOpen && <SidebarSettins onClose={() => setSettingsOpen(false)} />}
         </>
     )
 }
