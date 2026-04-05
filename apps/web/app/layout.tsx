@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "HomeGame",
+  title: "ScoreBoard",
   description: "Játékos pontszámok és statisztikák",
 };
 

@@ -4,13 +4,15 @@ import {useState} from "react"
 import styles from "./input.module.css"
 import { Eye, EyeOff } from "lucide-react";
 
-export default function Input({ id, title, placeholder, icon, type, autoComplete }: {
+export default function Input({ id, title, placeholder, icon, type, autoComplete, value = "", onChange = () => {} }: {
     id: string,
     type: string,
     title: string,
     placeholder: string,
     icon?: React.ReactElement<any, any>,
     autoComplete?: string,
+    value?: string,
+    onChange?: React.ChangeEventHandler<HTMLInputElement>
 }) {
     const isPasswordField = type === "password";
     const [showPassword, setShowPassword] = useState(false);
@@ -28,6 +30,8 @@ export default function Input({ id, title, placeholder, icon, type, autoComplete
                     id={id}
                     placeholder={placeholder}
                     {...(autoComplete && { autoComplete })}
+                    value={value}
+                    onChange={onChange}
                 />
 
                 {isPasswordField && (

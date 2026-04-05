@@ -123,7 +123,7 @@ pub async fn login(
     State(state): State<AppState>,
     Json(body): Json<LoginRequest>,
 ) -> Response {
-    // look up by email — emails are globally unique so no group ambiguity
+    // look up by email
     // role::TEXT casts the DB enum to a plain string that sqlx can map to User.role
     let user = sqlx::query_as!(
         User,
@@ -139,7 +139,7 @@ pub async fn login(
     let user = match user {
         Ok(Some(u)) => u,
         Ok(None) => {
-            // same error for wrong email or wrong password — don't leak which one
+            // same error for wrong email or wrong password
             return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({
                 "error": "Invalid email or password"
             }))).into_response();

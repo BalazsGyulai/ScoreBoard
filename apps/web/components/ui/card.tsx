@@ -13,7 +13,7 @@ export default function Card({children, heading, subHeading}: {
                 <div className={styles["brand-icon"]}>
                     <ChessRook size={16} className={styles["brand-icon-color"]} />
                 </div>
-                <span className={styles["brand-name"]}>ScoringGame</span>
+                <span className={styles["brand-name"]}>ScoreBoard</span>
             </div>
 
             {heading && <h1 className={styles.heading}>{heading}</h1>}

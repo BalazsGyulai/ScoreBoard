@@ -1,22 +1,28 @@
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
-    const body = await request.json();
+    const cookie = request.headers.get("cookie") ?? "";
 
-    const rustRes = await fetch(`${process.env.API_URL}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-        cache: "no-store",
-    });
 
-    const data = await rustRes.json();
+    let rustRes: Response;
 
-    const response = NextResponse.json(data, { status: rustRes.status });
+    try {
+        rustRes = await fetch(`${process.env.API_URL}/auth/logout`, {
+            method: "POST",
+            headers: { Cookie: cookie },
+            cache: "no-store",
+        });
+    } catch {
+        return NextResponse.json({ error: "API not reachable" }, { status: 502 });
+    }
+
+    const response = NextResponse.json({ message: "Logged out" }, { status: 200 });
+    const isProduction = process.env.NODE_ENV === "production";
 
     const cookies = rustRes.headers.getSetCookie();
     cookies.forEach((cookie) => {
-        response.headers.append("Set-Cookie", cookie);
+        const cleaned = isProduction ? cookie : cookie.replace(/;\s*Secure/gi, "");
+        response.headers.append("Set-Cookie", cleaned);
     });
 
     return response;

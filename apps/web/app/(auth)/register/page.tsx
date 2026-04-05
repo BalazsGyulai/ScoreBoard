@@ -6,8 +6,62 @@ import Card from "@/components/ui/card";
 import Input from "@/components/ui/input";
 import Button from "@/components/ui/button";
 import { User, AtSign, Shield, MoveRight } from "lucide-react";
+import { useTransition, useState } from "react";
+import { handleStringChange } from "@/lib/utils";
 
 export default function RegisterPage() {
+    const [isPending, startTransition] = useTransition();
+    const [error, setError] = useState<string | null>(null);
+
+    const [username, setUsername] = useState("");
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+    const [password2, setPassword2] = useState("");
+
+    const handleRegistration = () => {
+        setError(null);
+
+        const vusername = username.trim();
+        const vemail = email.trim();
+
+        if (vusername == "" || vemail == "" || password == "" || password2 == "") {
+            setError("Minden mező kitöltése kötelező");
+            return;
+        }
+
+        if (password !== password2) {
+            setError("A jelszók nem egyeznek");
+            return;
+        }
+
+        if (password.length < 8) {
+            setError("A jelszónak legalább 8 karakter hosszúnak kell lennie");
+            return;
+        }
+
+        startTransition(async () => {
+            try {
+                const res = await fetch("/api/auth/register", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ username, email, password, password2 }),
+                });
+
+                if (res.ok) {
+                    window.location.href = "/dashboard";
+                } else {
+                    let message = "Regisztráció sikertelen";
+                    try {
+                        const data = await res.json();
+                        message = data.error ?? message;
+                    } catch { }
+                    setError(message);
+                }
+            } catch {
+                setError("Nem sikerült csatlakozni a szerverhez");
+            }
+        })
+    }
 
     return (
         <Card
@@ -22,6 +76,9 @@ export default function RegisterPage() {
                     type={"text"}
                     placeholder={"e.g. kovacs.janos"}
                     icon={<User size={16} />}
+                    value={username}
+                    onChange={handleStringChange(setUsername)}
+                    autoComplete="username"
                 />
 
                 <Input
@@ -30,6 +87,9 @@ export default function RegisterPage() {
                     type={"text"}
                     placeholder={"e.g. myemail@email.com"}
                     icon={<AtSign size={16} />}
+                    value={email}
+                    onChange={handleStringChange(setEmail)}
+                    autoComplete="email"
                 />
 
                 <Input
@@ -38,36 +98,29 @@ export default function RegisterPage() {
                     type={"password"}
                     placeholder={"Legalább 8 karakter"}
                     icon={<Shield size={16} />}
+                    value={password}
+                    onChange={handleStringChange(setPassword)}
+                    autoComplete="new-password"
                 />
 
                 <Input
-                    id={"password"}
+                    id={"password2"}
                     title={"Jelszó"}
                     type={"password"}
                     placeholder={"Legalább 8 karakter"}
                     icon={<Shield size={16} />}
+                    value={password2}
+                    onChange={handleStringChange(setPassword2)}
+                    autoComplete="new-password"
                 />
-
-
-                {/* <div className="field">
-                    <label htmlFor="confirm">Jelszó megerősítése</label>
-                    <div className="input-wrap">
-                        <span className="icon">
-                            {/* <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
-                        </span>
-                        {/* <input type="password" id="confirm" placeholder="Ismételd meg a jelszót" oninput="checkMatch()" /> */}
-                {/* <button type="button" className="toggle-pw" onClick="togglePw('confirm', this)" aria-label="Jelszó megjelenítése">
-                            <svg id="eye-confirm" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
-                        </button>
-                    </div>
-                    <span className="hint" id="matchHint"></span>
-                </div> */}
 
             </div>
 
             <div className={styles.actions}>
                 <Button
                     text="Regisztráció"
+                    disabled={isPending}
+                    onClick={handleRegistration}
                 />
 
                 <p className={styles["login-link"]}>Már van fiókod? <Link href="/login">Jelentkezz be</Link></p>
