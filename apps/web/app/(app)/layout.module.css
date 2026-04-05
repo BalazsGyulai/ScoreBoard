@@ -1,10 +1,7 @@
-.shell {
-  display: flex;
-  min-height: 100vh;
-}
-
-.content {
-  flex: 1;
-  padding: var(--space-8);
-  overflow-y: auto;
-}
+ .dottedBackround {
+   background-image: radial-gradient(circle, #CBD5E1 1px, transparent 1px);
+   background-size: 28px 28px;
+   padding: 0 16px;
+   width: 100vw;
+   min-height: 100vh;
+ }

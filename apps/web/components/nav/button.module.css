@@ -1,0 +1,13 @@
+.nav-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: 99px;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--t) var(--ease);
+    flex-shrink: 0;
+    font-family: 'DM Sans', sans-serif;
+}

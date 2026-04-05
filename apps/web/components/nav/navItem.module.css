@@ -1,0 +1,22 @@
+.nav-item {
+    padding: 8px 18px;
+    border-radius: 99px;
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--slate-500);
+    cursor: pointer;
+    transition: color var(--t) var(--ease), background var(--t) var(--ease);
+    border: none;
+    background: none;
+    font-family: 'DM Sans', sans-serif;
+    white-space: nowrap;
+}
+
+.nav-item:hover {
+    color: var(--slate-900);
+}
+
+.nav-item.active {
+    background: var(--slate-900);
+    color: #fff;
+}

@@ -1,9 +1,5 @@
-// Authenticated app shell.
-// Every route inside (app)/ — dashboard, games, players, settings — renders
-// inside this layout. Put the sidebar Nav here once it's built.
-//
-// Currently a transparent pass-through so the routes render without errors.
-// Replace the <main> with <Sidebar /> + <main> when Nav.tsx is ready.
+import Navigation from "@/components/nav/navigation";
+import styles from "./layout.module.css"
 
 export default function AppLayout({
   children,
@@ -11,8 +7,10 @@ export default function AppLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="appShell">
-      {/* <Sidebar /> will go here */}
+    <div className={`${styles.dottedBackround}`}>
+
+      <Navigation />
+
       <main className="appContent">
         {children}
       </main>
