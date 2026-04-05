@@ -1,87 +1,35 @@
-/* ─── CSS custom properties (design tokens) ─────────────────────────────── */
-:root {
-  /* Brand colours */
-  --color-primary:   #fca311;   /* orange accent */
-  --color-secondary: #14213d;   /* dark navy */
-  --color-bg:        #ffffff;
-  --color-surface:   #f5f5f5;   /* card / input backgrounds */
-  --color-border:    #cccccc;
-  --color-disabled:  #cccccc;
-  --color-error:     #e63946;
-  --color-success:   #2a9d8f;
-  --color-text:      #14213d;
-  --color-text-muted: #6b7280;
+ /* ─── Design Tokens ─── */
+ :root {
+   --bg: #F7F8FA;
+   --card: #FFFFFF;
+   --slate-900: #0F172A;
+   --slate-700: #334155;
+   --slate-500: #64748B;
+   --slate-300: #CBD5E1;
+   --slate-100: #F1F5F9;
+   --accent: #0F172A;
+   --accent-hover: #1E293B;
+   --danger: #EF4444;
+   --success: #10B981;
+   --radius: 12px;
+   --radius-sm: 8px;
+   --transition: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+ }
 
-  /* Typography */
-  --font-sans: var(--font-geist-sans), Arial, Helvetica, sans-serif;
-  --font-mono: var(--font-geist-mono), monospace;
+ /* ─── Reset ─── */
+ *,
+ *::before,
+ *::after {
+   box-sizing: border-box;
+   margin: 0;
+   padding: 0;
+ }
 
-  /* Spacing scale */
-  --space-1: 0.25rem;
-  --space-2: 0.5rem;
-  --space-3: 0.75rem;
-  --space-4: 1rem;
-  --space-6: 1.5rem;
-  --space-8: 2rem;
-
-  /* Radius */
-  --radius-sm: 6px;
-  --radius-md: 9px;
-  --radius-lg: 16px;
-
-  /* Shadows */
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-/* ─── Reset ──────────────────────────────────────────────────────────────── */
-*,
-*::before,
-*::after {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-/* ─── Base ───────────────────────────────────────────────────────────────── */
-html {
-  font-size: 16px;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-body {
-  font-family: var(--font-sans);
-  background-color: var(--color-bg);
-  color: var(--color-text);
-  min-height: 100vh;
-}
-
-/* ─── Links ──────────────────────────────────────────────────────────────── */
-a {
-  color: inherit;
-  text-decoration: none;
-}
-
-/* ─── Images ─────────────────────────────────────────────────────────────── */
-img,
-svg {
-  display: block;
-  max-width: 100%;
-}
-
-/* ─── Buttons ────────────────────────────────────────────────────────────── */
-button {
-  font-family: inherit;
-  cursor: pointer;
-  border: none;
-  background: none;
-}
-
-/* ─── Inputs ─────────────────────────────────────────────────────────────── */
-input,
-select,
-textarea {
-  font-family: inherit;
-  font-size: inherit;
-}
+ html,
+ body {
+   min-height: 100vh;
+   font-family: 'DM Sans', sans-serif;
+   background: var(--bg);
+   color: var(--slate-900);
+   -webkit-font-smoothing: antialiased;
+ }

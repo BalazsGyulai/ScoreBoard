@@ -3,13 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev":   "NODE_OPTIONS='--localstorage-file=/tmp/homegame-dev-ls.json' next dev",
+    "dev": "NODE_OPTIONS='--localstorage-file=/tmp/homegame-dev-ls.json' next dev",
     "build": "next build",
     "start": "next start",
-    "lint":  "eslint ."
+    "lint": "eslint ."
   },
   "dependencies": {
-    "next": "15.3.0",
+    "next": "^15.5.14",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },

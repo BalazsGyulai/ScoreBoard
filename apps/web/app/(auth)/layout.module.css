@@ -1,0 +1,11 @@
+ /* ─── Subtle dot-grid background ─── */
+ .dottedBackround {
+     background-image: radial-gradient(circle, #CBD5E1 1px, transparent 1px);
+     background-size: 28px 28px;
+     display: flex;
+     align-items: center;
+     justify-content: center;
+     padding: 40px 16px;
+     width: 100vw;
+     height: 100vh;
+ }

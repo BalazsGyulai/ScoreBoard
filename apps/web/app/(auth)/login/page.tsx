@@ -2,82 +2,62 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { ChessRook, MoveRight, User, AtSign, Shield } from "lucide-react";
 import Link from "next/link";
 import styles from "./login.module.css";
+import Input from "@/components/ui/input";
+import Button from "@/components/ui/button";
+import Card from "@/components/ui/card";
 
 export default function LoginPage() {
-    const router = useRouter();
-    const [isPending, startTransition] = useTransition();
 
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
-    const [error, setError] = useState<string | null>(null);
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        setError(null);
-
-        startTransition(async () => {
-            const res = await fetch("/api/auth/login", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email, password }),
-            });
-
-            if (res.ok) {
-                router.push("/dashboard");
-                router.refresh();
-            } else {
-                const data = await res.json();
-                setError(data.error ?? "Belépés sikertelen");
-            }
-        });
-    };
 
     return (
-        <div className={styles.page}>
-            <form className={styles.form} onSubmit={handleSubmit}>
-                <h1 className={styles.title}>Belépés</h1>
+        <Card
+            heading="Belépés a fiókomba"
+        >
+            <div className={styles.fields} id="regForm">
 
-                {error && <p className={styles.error}>{error}</p>}
+                <Input
+                    id={"email"}
+                    title={"Email"}
+                    type={"text"}
+                    placeholder={"e.g. myemail@email.com"}
+                    icon={<AtSign size={16} />}
+                />
 
-                <div className={styles.field}>
-                    <label htmlFor="email">Email</label>
-                    <input
-                        id="email"
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        required
-                        autoComplete="email"
-                    />
-                </div>
+                <Input
+                    id={"password"}
+                    title={"Jelszó"}
+                    type={"password"}
+                    placeholder={"Legalább 8 karakter"}
+                    icon={<Shield size={16} />}
+                />
 
-                <div className={styles.field}>
-                    <label htmlFor="password">Jelszó</label>
-                    <input
-                        id="password"
-                        type="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                        autoComplete="current-password"
-                    />
-                </div>
 
-                <div className={styles.actions}>
-                    <button
-                        type="submit"
-                        className={styles.primaryBtn}
-                        disabled={isPending || !email || !password}
-                    >
-                        {isPending ? "..." : "Belépés"}
-                    </button>
-                    <Link href="/register" className={styles.secondaryBtn}>
-                        Regisztráció
-                    </Link>
-                </div>
-            </form>
-        </div>
+                {/* <div className="field">
+                    <label htmlFor="confirm">Jelszó megerősítése</label>
+                    <div className="input-wrap">
+                        <span className="icon">
+                            {/* <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
+                        </span>
+                        {/* <input type="password" id="confirm" placeholder="Ismételd meg a jelszót" oninput="checkMatch()" /> */}
+                {/* <button type="button" className="toggle-pw" onClick="togglePw('confirm', this)" aria-label="Jelszó megjelenítése">
+                            <svg id="eye-confirm" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
+                        </button>
+                    </div>
+                    <span className="hint" id="matchHint"></span>
+                </div> */}
+
+            </div>
+
+            <div className={styles.actions}>
+                <Button
+                    text="Belépés"
+                />
+
+                <p className={styles["login-link"]}>Még nincs fiókod? <Link href="/register">Regisztrálj</Link></p>
+            </div>
+        </Card>
     );
 }

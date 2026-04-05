@@ -1,0 +1,39 @@
+.btn-primary {
+     width: 100%;
+     height: 46px;
+     background: var(--slate-900);
+     color: #fff;
+     border: none;
+     border-radius: var(--radius-sm);
+     font-family: 'DM Sans', sans-serif;
+     font-size: 14px;
+     font-weight: 500;
+     letter-spacing: 0.01em;
+     cursor: pointer;
+     display: flex;
+     align-items: center;
+     justify-content: center;
+     gap: 8px;
+     transition: background var(--transition), transform var(--transition), box-shadow var(--transition);
+     position: relative;
+     overflow: hidden;
+ }
+
+ .btn-primary::after {
+     content: '';
+     position: absolute;
+     inset: 0;
+     background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, transparent 60%);
+     pointer-events: none;
+ }
+
+ .btn-primary:hover {
+     background: var(--accent-hover);
+     transform: translateY(-1px);
+     box-shadow: 0 4px 14px rgba(15, 23, 42, 0.18);
+ }
+
+ .btn-primary:active {
+     transform: translateY(0);
+     box-shadow: none;
+ }

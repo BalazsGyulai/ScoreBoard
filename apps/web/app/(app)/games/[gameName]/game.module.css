@@ -1,0 +1,162 @@
+.page {
+  max-width: 700px;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: var(--space-8);
+}
+
+.back {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  display: block;
+  margin-bottom: var(--space-1);
+  transition: color 0.15s;
+}
+
+.back:hover {
+  color: var(--color-text);
+}
+
+.heading {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--color-secondary);
+}
+
+.meta {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  margin-top: var(--space-1);
+}
+
+.logBtn {
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  transition: border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.logBtn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-text);
+}
+
+.section {
+  margin-bottom: var(--space-8);
+}
+
+.sectionTitle {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--color-secondary);
+  margin-bottom: var(--space-3);
+}
+
+/* Scoreboard table */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+}
+
+.table th {
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 2px solid var(--color-border);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.table td {
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.table tr.leader td {
+  font-weight: 700;
+  color: var(--color-secondary);
+}
+
+.total {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+/* Round form */
+.roundForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.formError {
+  color: var(--color-error);
+  font-size: 0.875rem;
+}
+
+.scoreInputs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.scoreRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.scoreLabel {
+  width: 160px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.scoreInput {
+  width: 120px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 1rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.scoreInput:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.submitBtn {
+  align-self: flex-start;
+  padding: var(--space-3) var(--space-6);
+  background: var(--color-primary);
+  color: var(--color-secondary);
+  font-weight: 700;
+  border-radius: var(--radius-sm);
+  font-size: 1rem;
+  transition: opacity 0.15s;
+}
+
+.submitBtn:hover:not(:disabled) {
+  opacity: 0.85;
+}
+
+.submitBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.error {
+  color: var(--color-error);
+}

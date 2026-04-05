@@ -1,7 +1,7 @@
 use axum::{
     extract::State,
     http::{header, StatusCode},
-    response::{IntoResponse, Response},
+    response::{AppendHeaders, IntoResponse, Response},
     Json,
 };
 use uuid::Uuid;
@@ -104,10 +104,10 @@ pub async fn register(State(state): State<AppState>, Json(body): Json<RegisterRe
 
     (
         StatusCode::CREATED,
-        [
+        AppendHeaders([
             (header::SET_COOKIE, make_cookie("hg_access_token",  access_token,  access_max_age)),
             (header::SET_COOKIE, make_cookie("hg_refresh_token", refresh_token, refresh_max_age)),
-        ],
+        ]),
         Json(AuthResponse {
             user_id,
             group_id,
@@ -168,10 +168,10 @@ pub async fn login(
 
     (
         StatusCode::OK,
-        [
+        AppendHeaders([
             (header::SET_COOKIE, make_cookie("hg_access_token",  access_token,  access_max_age)),
             (header::SET_COOKIE, make_cookie("hg_refresh_token", refresh_token, refresh_max_age)),
-        ],
+        ]),
         Json(AuthResponse {
             user_id:  user.id,
             group_id: user.group_id,
@@ -186,10 +186,10 @@ pub async fn login(
 pub async fn logout() -> Response {
     (
         StatusCode::OK,
-        [
-            (header::SET_COOKIE, "hg_access_token=;  HttpOnly; Path=/; Max-Age=0".to_string()),
-            (header::SET_COOKIE, "hg_refresh_token=; HttpOnly; Path=/; Max-Age=0".to_string()),
-        ],
+        AppendHeaders([
+            (header::SET_COOKIE, make_cookie("hg_access_token",  String::new(), 0)),
+            (header::SET_COOKIE, make_cookie("hg_refresh_token", String::new(), 0)),
+        ]),
         Json(serde_json::json!({ "message": "Logged out" })),
     )
         .into_response()
