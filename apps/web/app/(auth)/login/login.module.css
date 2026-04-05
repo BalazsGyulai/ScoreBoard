@@ -12,25 +12,6 @@
      gap: 18px;
  }
 
-
- /* password toggle */
- .toggle-pw {
-     position: absolute;
-     right: 13px;
-     background: none;
-     border: none;
-     cursor: pointer;
-     color: var(--slate-300);
-     display: flex;
-     padding: 4px;
-     border-radius: 4px;
-     transition: color var(--transition);
- }
-
- .toggle-pw:hover {
-     color: var(--slate-700);
- }
-
  /* validation hint */
  .hint {
      font-size: 12px;

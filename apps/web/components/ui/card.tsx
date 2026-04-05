@@ -3,7 +3,7 @@ import styles from "./card.module.css"
 
 export default function Card({children, heading, subHeading}: {
     heading?: string,
-    subHeading?: string,
+    subHeading?: React.ReactNode,
     children?: React.ReactNode,
 }) {
     return (
