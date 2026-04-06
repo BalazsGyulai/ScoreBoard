@@ -64,14 +64,18 @@ pub async fn create_game(
     if body.winner_rule != "min" && body.winner_rule != "max" {
         return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": "winner_rule must be 'min' or 'max'" }))).into_response();
     }
+    if body.icon.trim().is_empty() {
+        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": "Game icon is required" }))).into_response();
+    }
 
     let game_id = Uuid::new_v4();
     let result = sqlx::query!(
-        "INSERT INTO games (id, group_id, name, winner_rule) VALUES ($1, $2, $3, $4)",
+        "INSERT INTO games (id, group_id, name, winner_rule, icon) VALUES ($1, $2, $3, $4, $5)",
         game_id,
         auth.group_id,
         body.name.trim(),
         body.winner_rule,
+        body.icon.trim(),
     )
     .execute(&state.db)
     .await;
@@ -81,6 +85,7 @@ pub async fn create_game(
             "id": game_id,
             "name": body.name.trim(),
             "winner_rule": body.winner_rule,
+            "icon": body.icon.trim(),
         }))).into_response(),
         Err(e) if e.to_string().contains("unique") => {
             (StatusCode::CONFLICT, Json(serde_json::json!({ "error": "A game with this name already exists" }))).into_response()

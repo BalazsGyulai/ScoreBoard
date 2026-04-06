@@ -17,4 +17,5 @@ pub struct Game {
 pub struct CreateGameRequest {
     pub name: String,
     pub winner_rule: String, // "min" or "max"
+    pub icon: String,
 }

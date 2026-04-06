@@ -70,7 +70,6 @@ export default function SidebarSettins({
                 <div className={styles["s-section"]}>
                     <div className={styles["s-label"]}>Játékosok</div>
                     {players.map((p, i) => (
-                        <>
                         <div className={styles["pt-row"]} key={p.id}>
                             <div
                                 className={`${styles.avatar} ${styles.av36}`}
@@ -90,7 +89,6 @@ export default function SidebarSettins({
                                 <Eye size={12} />
                             </button>
                         </div>
-                        </>
                     ))}
                 </div>
 
