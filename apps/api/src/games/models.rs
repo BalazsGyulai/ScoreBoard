@@ -9,6 +9,7 @@ pub struct Game {
     pub group_id: Uuid,
     pub name: String,
     pub winner_rule: String,
+    pub icon: String,
     pub current_round: i32,
     pub created_at: DateTime<Utc>,
 }

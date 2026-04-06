@@ -9,7 +9,6 @@ import IconPicker from "@/components/ui/iconPicker";
 import Button from "@/components/ui/button";
 import { handleStringChange } from "@/lib/utils";
 import styles from "./new.module.css";
-import { assert } from "console";
 
 const winnerRuleOptions = [
     {
@@ -29,7 +28,7 @@ const winnerRuleOptions = [
 ];
 
 export default function NewGamePage() {
-    const [isPeding, startTransition] = useTransition();
+    const [isPending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
     const [gameName, setGameName] = useState("");
     const [winnerRule, setWinnerRule] = useState("min");
@@ -60,6 +59,7 @@ export default function NewGamePage() {
                 const res = await fetch("/api/games", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
+                    credentials: "include",
                     body: JSON.stringify({
                         name: gameName.trim(),
                         winner_rule: winnerRule.trim(),
@@ -134,7 +134,7 @@ export default function NewGamePage() {
                         {error && <p className={styles.error}>{error}</p>}
 
                         <div className={styles.actions}>
-                            <Button text="Játék létrehozása" onClick={handleCreate} disabled={isPeding} />
+                            <Button text="Játék létrehozása" onClick={handleCreate} disabled={isPending} />
                         </div>
                     </Card>
                 </div>

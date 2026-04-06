@@ -29,6 +29,7 @@ export default function AddPlayerForm() {
       const res = await fetch("/api/players", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ username, email, password }),
       });
 

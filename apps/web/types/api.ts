@@ -85,6 +85,7 @@ export interface ApiGame {
   group_id:      string;
   name:          string;
   winner_rule:   WinnerRule;
+  icon:          string;
   current_round: number;
   created_at:    string;
 }
@@ -92,6 +93,7 @@ export interface ApiGame {
 export interface CreateGameRequest {
   name:        string;
   winner_rule: WinnerRule;
+  icon:        string;
 }
 
 // ─── Scores ───────────────────────────────────────────────────────────────────

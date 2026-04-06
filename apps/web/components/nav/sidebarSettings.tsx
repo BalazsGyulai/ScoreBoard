@@ -32,6 +32,7 @@ export default function SidebarSettins({
                 const res = await fetch("/api/auth/logout", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
+                            credentials: "include",
                 });
 
                 if (res.ok) {

@@ -24,13 +24,18 @@ const nextConfig: NextConfig = {
   // Rewrites let the browser call /api/sse/... without knowing the Rust server's address.
   // The Next.js server proxies it internally — the Rust URL never leaks to the client.
   async rewrites() {
+    const API_URL = process.env.API_URL ?? "http://localhost:8080";
     return [
       {
-        // Proxy everything under /api/ to Rust EXCEPT /api/auth/*
-        // Auth routes have Next.js Route Handlers that must run first
-        // (they copy the Set-Cookie headers from Rust to the browser response)
-        source: "/api/((?!auth/).*)",
-        destination: `${process.env.API_URL ?? "http://localhost:8080"}/:path*`,
+        // Proxy the routes the frontend calls directly.
+        // `/api/auth/*` is intentionally left to Next.js route handlers
+        // (they copy Set-Cookie from Rust to the browser).
+        source: "/api/games",
+        destination: `${API_URL}/games`,
+      },
+      {
+        source: "/api/players",
+        destination: `${API_URL}/players`,
       },
     ];
   },

@@ -13,7 +13,7 @@ use crate::{auth::middleware::AuthUser, AppState};
 pub async fn list_games(auth: AuthUser, State(state): State<AppState>) -> Response {
     let result = sqlx::query_as!(
         Game,
-        "SELECT id, group_id, name, winner_rule, current_round, created_at
+        "SELECT id, group_id, name, winner_rule, icon, current_round, created_at
          FROM games WHERE group_id = $1 ORDER BY name",
         auth.group_id,
     )
@@ -34,7 +34,7 @@ pub async fn get_game(
 ) -> Response {
     let result = sqlx::query_as!(
         Game,
-        "SELECT id, group_id, name, winner_rule, current_round, created_at
+        "SELECT id, group_id, name, winner_rule, icon, current_round, created_at
          FROM games WHERE id = $1 AND group_id = $2",
         id,
         auth.group_id,
