@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Dices, Star } from "lucide-react";
+import { mutate } from "swr";
 import Card from "@/components/ui/card";
 import Input from "@/components/ui/input";
 import Dropdown from "@/components/ui/dropdown";
@@ -68,6 +69,8 @@ export default function NewGamePage() {
                 });
 
                 if (res.ok) {
+                    // Refresh the cached games list once, so the /games page shows the new one.
+                    void mutate("/api/games");
                     window.location.href = "/games";
                 } else {
                     let message = "Játék létrehozása";
