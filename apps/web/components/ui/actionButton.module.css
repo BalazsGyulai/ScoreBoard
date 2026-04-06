@@ -1,0 +1,69 @@
+.btn {
+  height: 38px;
+  padding: 0 16px;
+  border-radius: var(--radius-sm);
+  font-family: "DM Sans", sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  transition: all var(--t) var(--ease);
+  white-space: nowrap;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Ghost ── */
+.btn-ghost {
+  background: var(--card);
+  border: 1px solid var(--slate-200);
+  color: var(--slate-700);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: var(--slate-100);
+}
+
+/* ── Dark ── */
+.btn-dark {
+  background: var(--slate-900);
+  color: #fff;
+}
+
+.btn-dark:hover:not(:disabled) {
+  background: #1e293b;
+}
+
+/* ── Amber ── */
+.btn-amber {
+  background: var(--orange);
+  color: #fff;
+}
+
+.btn-amber:hover:not(:disabled) {
+  background: var(--orange-dk);
+}
+
+/* ── Danger ── */
+.btn-danger {
+  background: var(--danger-lt);
+  color: var(--danger);
+  border: 1px solid #fecaca;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #fecaca;
+}
+
+/* ── Small ── */
+.btn-sm {
+  height: 30px;
+  font-size: 12px;
+  padding: 0 10px;
+}

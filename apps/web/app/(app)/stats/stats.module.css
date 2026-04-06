@@ -1,40 +1,19 @@
-.dash-top {
+.page-top {
   margin-bottom: 26px;
 }
 
-.dash-top p {
+.page-top p {
   font-size: 14px;
   font-weight: 300;
   color: var(--slate-500);
   margin-top: 4px;
 }
 
-.orange {
-  color: var(--orange);
-}
-
 .muted {
   color: var(--slate-500);
 }
 
-/* ── Stat cards grid ── */
-.stats4 {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 13px;
-  margin-bottom: 22px;
-}
-
-/* ── 2-column layout ── */
-.dash2 {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
-/* ── Head-to-head card ── */
-.dash3 {
+.section {
   margin-bottom: 16px;
 }
 
@@ -93,17 +72,9 @@
   flex-shrink: 0;
 }
 
-.r1 {
-  color: var(--orange);
-}
-
-.r2 {
-  color: var(--slate-500);
-}
-
-.r3 {
-  color: #b45309;
-}
+.r1 { color: var(--orange); }
+.r2 { color: var(--slate-500); }
+.r3 { color: #b45309; }
 
 .lb-name {
   flex: 1;
@@ -139,7 +110,6 @@
   border-radius: 99px;
 }
 
-/* ── Avatar ── */
 .avatar {
   border-radius: 10px;
   display: flex;
@@ -154,82 +124,6 @@
   width: 36px;
   height: 36px;
   font-size: 13px;
-}
-
-/* ── Recent games ── */
-.rg-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 9px 8px;
-  margin: 0 -8px;
-  border-radius: 9px;
-  cursor: pointer;
-  transition: background var(--t) var(--ease);
-  text-decoration: none;
-  color: inherit;
-}
-
-.rg-row:hover {
-  background: var(--slate-100);
-}
-
-.rg-icon {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
-  background: var(--slate-100);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
-  flex-shrink: 0;
-}
-
-.rg-info {
-  flex: 1;
-}
-
-.rg-name {
-  font-weight: 500;
-  font-size: 14px;
-}
-
-.rg-meta {
-  font-size: 12px;
-  color: var(--slate-500);
-}
-
-.rg-winner {
-  font-size: 11.5px;
-  font-weight: 600;
-  color: #92400e;
-  background: var(--orange-lt);
-  padding: 2px 9px;
-  border-radius: 99px;
-}
-
-/* ── Ghost button (for "Mind →") ── */
-.btn-ghost {
-  height: 30px;
-  padding: 0 10px;
-  border-radius: var(--radius-sm);
-  font-family: "DM Sans", sans-serif;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--card);
-  border: 1px solid var(--slate-200);
-  color: var(--slate-700);
-  text-decoration: none;
-  transition: background var(--t) var(--ease);
-}
-
-.btn-ghost:hover {
-  background: var(--slate-100);
 }
 
 /* ── Head-to-head table ── */

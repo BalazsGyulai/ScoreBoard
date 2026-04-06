@@ -42,9 +42,20 @@
 }
 
 .nav-btn-add {
+    width: 34px;
+    height: 34px;
+    border-radius: 99px;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--t) var(--ease);
+    flex-shrink: 0;
     background: var(--orange);
     color: #fff;
     margin-left: 4px;
+    text-decoration: none;
 }
 
 .nav-btn-add:hover {

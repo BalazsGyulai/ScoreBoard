@@ -1,44 +1,66 @@
-'use client';
+"use client";
 
-import Button from "./button"
-import styles from "./navigation.module.css"
-import { Settings, Plus } from "lucide-react"
-import NavItem from "./navItem"
-import SidebarSettins from "./sidebarSettings"
+import Link from "next/link";
+import Button from "./button";
+import styles from "./navigation.module.css";
+import { Settings, Plus } from "lucide-react";
+import NavItem from "./navItem";
+import SidebarSettins from "./sidebarSettings";
 import { useState } from "react";
+import { usePathname } from "next/navigation";
 
 export default function Navigation() {
-    const [isSettingsOpen, setSettingsOpen] = useState(false);
-    const [activePage, setActivePage] = useState("dashboard")
+  const [isSettingsOpen, setSettingsOpen] = useState(false);
+  const pathname = usePathname();
 
-    return (
-        <>
-            <nav className={styles["nav-wrap"]}>
-                <div className={styles["nav-pill"]}>
-                    <Button
-                        className={styles["nav-btn-gear"]}
-                        title="Beállítások"
-                        icon={<Settings size={14} />}
-                        onClick={() => setSettingsOpen(true)}
-                    />
+  const activePage = pathname.startsWith("/games")
+    ? "games"
+    : pathname.startsWith("/stats")
+      ? "stats"
+      : pathname.startsWith("/players")
+        ? "stats"
+        : "dashboard";
 
-                    <div className={styles["nav-sep"]}></div>
+  return (
+    <>
+      <nav className={styles["nav-wrap"]}>
+        <div className={styles["nav-pill"]}>
+          <Button
+            className={styles["nav-btn-gear"]}
+            title="Beállítások"
+            icon={<Settings size={14} />}
+            onClick={() => setSettingsOpen(true)}
+          />
 
-                    <NavItem title="Dashboard" active={activePage === "dashboard"} href="/dashboard" />
-                    <NavItem title="Játékok" active={activePage === "games"} href="/games" />
-                    <NavItem title="Statisztika" active={activePage === "statistics"} href="/"/>
+          <div className={styles["nav-sep"]} />
 
-                    <div className={styles["nav-sep"]}></div>
+          <NavItem
+            title="Dashboard"
+            active={activePage === "dashboard"}
+            href="/dashboard"
+          />
+          <NavItem
+            title="Játékok"
+            active={activePage === "games"}
+            href="/games"
+          />
+          <NavItem
+            title="Statisztika"
+            active={activePage === "stats"}
+            href="/stats"
+          />
 
-                    <Button
-                        className={styles["nav-btn-add"]}
-                        title="Új játék"
-                        icon={<Plus size={15} />}
-                    />
-                </div>
-            </nav>
+          <div className={styles["nav-sep"]} />
 
-            {isSettingsOpen && <SidebarSettins onClose={() => setSettingsOpen(false)} />}
-        </>
-    )
+          <Link href="/games/new" className={styles["nav-btn-add"]} title="Új játék">
+            <Plus size={15} />
+          </Link>
+        </div>
+      </nav>
+
+      {isSettingsOpen && (
+        <SidebarSettins onClose={() => setSettingsOpen(false)} />
+      )}
+    </>
+  );
 }

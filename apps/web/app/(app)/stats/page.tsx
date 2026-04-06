@@ -1,58 +1,28 @@
-import StatisticCard from "@/components/ui/statisticCard";
-import ScoreCard from "@/components/ui/scoreCard";
 import Link from "next/link";
-import { players, avatarColors, recentGames, streaks } from "@/lib/mockData";
-import styles from "./dashboard.module.css";
+import { players, avatarColors, streaks } from "@/lib/mockData";
+import styles from "./stats.module.css";
 
-export default function Dashboard() {
+export default function StatsPage() {
   const sorted = [...players].sort(
     (a, b) => b.wins / b.games - a.wins / a.games,
   );
 
   return (
     <div className="view">
-      <div className={styles["dash-top"]}>
-        <h1>
-          Jó estét, <span className={styles.orange}>Bali</span> 👋
-        </h1>
-        <p>47 meccs rögzítve · 7 játékos · Utoljára játszva: ma</p>
+      <div className={styles["page-top"]}>
+        <h1>Statisztika</h1>
+        <p>Csoport ranglista és összesített eredmények</p>
       </div>
 
-      {/* ── 4 stat cards ── */}
-      <div className={styles.stats4}>
-        <StatisticCard
-          label="Győzelmi arány"
-          value="68%"
-          subLabel="↑ 4% az elmúlt hónapban"
-          dark
-        />
-        <StatisticCard
-          label="Összes meccs"
-          value="47"
-          subLabel="12 különböző játék"
-        />
-        <StatisticCard
-          label="Legjobb játék"
-          value="Skyjo 🃏"
-          subLabel="8/11 meccs megnyerve"
-        />
-        <StatisticCard
-          label="Legtöbb aktív"
-          value="Atis"
-          subLabel="47-ből 41 meccsen"
-        />
-      </div>
-
-      {/* ── 2-column: Leaderboard + Recent games ── */}
-      <div className={styles.dash2}>
-        <ScoreCard
-          title="Ranglista"
-          extraElement={
+      {/* ── Full leaderboard ── */}
+      <div className={`${styles.card} ${styles.section}`}>
+        <div className={styles.p24}>
+          <div className={styles["section-hdr"]}>
+            <h2>Ranglista</h2>
             <span className={styles.muted} style={{ fontSize: 12 }}>
               Win %
             </span>
-          }
-        >
+          </div>
           {sorted.map((p, i) => {
             const pct = Math.round((p.wins / p.games) * 100);
             const rankClass =
@@ -99,38 +69,11 @@ export default function Dashboard() {
               </Link>
             );
           })}
-        </ScoreCard>
-
-        <ScoreCard
-          title="Legutóbbi meccsek"
-          extraElement={
-            <Link
-              href="/games"
-              className={styles["btn-ghost"]}
-            >
-              Mind →
-            </Link>
-          }
-        >
-          {recentGames.map((r) => (
-            <Link
-              href="/games/skyjo"
-              key={r.name}
-              className={styles["rg-row"]}
-            >
-              <div className={styles["rg-icon"]}>{r.icon}</div>
-              <div className={styles["rg-info"]}>
-                <div className={styles["rg-name"]}>{r.name}</div>
-                <div className={styles["rg-meta"]}>{r.info}</div>
-              </div>
-              <span className={styles["rg-winner"]}>🏆 {r.winner}</span>
-            </Link>
-          ))}
-        </ScoreCard>
+        </div>
       </div>
 
       {/* ── Head-to-head table ── */}
-      <div className={`${styles.card} ${styles.dash3}`}>
+      <div className={`${styles.card} ${styles.section}`}>
         <div className={styles.p24}>
           <div className={styles["section-hdr"]}>
             <h2>Összesített táblázat</h2>
@@ -161,11 +104,14 @@ export default function Dashboard() {
                   return (
                     <tr key={p.id}>
                       <td>
-                        <div
+                        <Link
+                          href={`/players/${origIdx}`}
                           style={{
                             display: "flex",
                             alignItems: "center",
                             gap: 8,
+                            textDecoration: "none",
+                            color: "inherit",
                           }}
                         >
                           <div
@@ -181,14 +127,11 @@ export default function Dashboard() {
                           <span style={{ fontWeight: 500, fontSize: 14 }}>
                             {p.name}
                           </span>
-                        </div>
+                        </Link>
                       </td>
                       <td>
                         <span
-                          style={{
-                            fontWeight: 600,
-                            color: "var(--success)",
-                          }}
+                          style={{ fontWeight: 600, color: "var(--success)" }}
                         >
                           {p.wins}
                         </span>

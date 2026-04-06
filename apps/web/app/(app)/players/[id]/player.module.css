@@ -1,51 +1,210 @@
-.page {
-  max-width: 500px;
+/* ── Player header ── */
+.player-hdr {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
 }
 
-.back {
-  font-size: 0.875rem;
-  color: var(--color-text-muted);
-  display: block;
-  margin-bottom: var(--space-3);
-  transition: color 0.15s;
+.player-hdr-info {
+  flex: 1;
 }
 
-.back:hover {
-  color: var(--color-text);
+.player-pid {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--orange);
+  margin-bottom: 2px;
 }
 
-.heading {
-  font-size: 1.75rem;
+.player-sub {
+  font-size: 13px;
+  color: var(--slate-500);
+  margin-top: 2px;
+}
+
+.player-nav {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* ── Avatar ── */
+.avatar {
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "Bricolage Grotesque", sans-serif;
   font-weight: 700;
-  color: var(--color-secondary);
-  margin-bottom: var(--space-6);
-}
-
-.info {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
-.row {
-  display: flex;
-  padding: var(--space-3) 0;
-  border-bottom: 1px solid var(--color-border);
-  gap: var(--space-4);
-}
-
-.row dt {
-  width: 140px;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--color-text-muted);
   flex-shrink: 0;
 }
 
-.row dd {
-  font-size: 0.9375rem;
+.av36 {
+  width: 36px;
+  height: 36px;
+  font-size: 13px;
 }
 
-.error {
-  color: var(--color-error);
+.av64 {
+  width: 64px;
+  height: 64px;
+  font-size: 24px;
+  border-radius: 16px;
+}
+
+/* ── Stat cards grid ── */
+.pstats4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 13px;
+  margin-bottom: 22px;
+}
+
+/* ── 2-column layout ── */
+.pdash2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--slate-200);
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 20px rgba(0, 0, 0, 0.04);
+}
+
+.p24 {
+  padding: 24px;
+}
+
+.section-hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+/* ── Game breakdown list ── */
+.pgi-wrap {
+  display: flex;
+  flex-direction: column;
+}
+
+.pgi-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--slate-100);
+}
+
+.pgi-row:last-child {
+  border-bottom: none;
+}
+
+.pgi-name {
+  font-weight: 500;
+  font-size: 14px;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pgi-stats {
+  display: flex;
+  gap: 20px;
+}
+
+.pgi-stat {
+  text-align: center;
+}
+
+.v {
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.l {
+  font-size: 10.5px;
+  color: var(--slate-500);
+  margin-top: 2px;
+}
+
+.green {
+  color: var(--success);
+}
+
+.red {
+  color: var(--danger);
+}
+
+/* ── Activity chart ── */
+.act-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 5px;
+  height: 100px;
+}
+
+.act-bar-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  height: 100%;
+}
+
+.act-bar-inner {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.act-bar {
+  border-radius: 4px 4px 0 0;
+  background: linear-gradient(180deg, var(--orange), #fde68a);
+  min-height: 4px;
+}
+
+.act-label {
+  font-size: 10px;
+  color: var(--slate-500);
+}
+
+.act-val {
+  font-size: 10px;
+  color: var(--slate-500);
+}
+
+/* ── Rival rows ── */
+.rival-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.rival-row:last-child {
+  margin-bottom: 0;
+}
+
+.bar-track {
+  height: 6px;
+  background: var(--slate-100);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  border-radius: 99px;
 }
