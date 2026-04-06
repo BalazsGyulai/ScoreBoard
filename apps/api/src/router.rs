@@ -42,6 +42,7 @@ pub fn build(state: AppState) -> Router {
             "/games/{id}/scores",
             get(scores::handlers::get_scores).post(scores::handlers::add_round),
         )
+        .route("/scores/{id}", axum::routing::put(scores::handlers::update_score))
 
         // ── Stats ─────────────────────────────────────────────────────────────
         .route("/stats", get(stats::handlers::leaderboard))

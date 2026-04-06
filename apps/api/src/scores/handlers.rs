@@ -6,7 +6,7 @@ use axum::{
 };
 use uuid::Uuid;
 
-use super::models::{AddRoundRequest, ScoreRow};
+use super::models::{AddRoundRequest, ScoreRow, UpdateScoreRequest};
 use crate::{auth::middleware::AuthUser, AppState};
 
 // GET /games/:id/scores — all scores grouped by round
@@ -112,4 +112,36 @@ pub async fn add_round(
     }
 
     (StatusCode::CREATED, Json(serde_json::json!({ "round": current_round }))).into_response()
+}
+
+// PUT /scores/:id — update a single score value
+pub async fn update_score(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(score_id): Path<Uuid>,
+    Json(body): Json<UpdateScoreRequest>,
+) -> Response {
+    // Ensure this score belongs to a game in the caller's group.
+    // This prevents editing other groups' scores by guessing UUIDs.
+    let result = sqlx::query!(
+        r#"
+        UPDATE scores s
+        SET value = $1
+        FROM games g
+        WHERE s.id = $2
+          AND s.game_id = g.id
+          AND g.group_id = $3
+        "#,
+        body.value,
+        score_id,
+        auth.group_id,
+    )
+    .execute(&state.db)
+    .await;
+
+    match result {
+        Ok(r) if r.rows_affected() > 0 => StatusCode::NO_CONTENT.into_response(),
+        Ok(_) => StatusCode::NOT_FOUND.into_response(),
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
 }

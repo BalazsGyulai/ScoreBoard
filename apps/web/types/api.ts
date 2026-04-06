@@ -107,11 +107,32 @@ export interface ApiScore {
   recorded_at: string;
 }
 
+/**
+ * Row returned by Rust `GET /games/:id/scores`.
+ * Note: the Rust API returns `username` but not `game_id`.
+ */
+export interface ApiScoreRow {
+  id:          string;
+  user_id:     string;
+  username:    string;
+  round:       number;
+  value:       number;
+  recorded_at: string;
+}
+
 export interface AddScoreRequest {
   user_id: string;
   game_id: string;
   value:   number;
   round?:  number;  // omit to use the game's current_round
+}
+
+export interface AddRoundRequest {
+  scores: { player_id: string; value: number }[];
+}
+
+export interface UpdateScoreRequest {
+  value: number;
 }
 
 /** Per-player row returned from GET /games/:id/scores */

@@ -25,3 +25,8 @@ pub struct PlayerScore {
     pub player_id: Uuid,
     pub value: i32,
 }
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateScoreRequest {
+    pub value: i32,
+}
