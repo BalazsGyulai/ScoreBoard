@@ -1,0 +1,50 @@
+.card {
+    background: var(--card);
+    border: 1px solid var(--slate-200);
+    border-radius: 16px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 20px rgba(0, 0, 0, 0.04);
+}
+
+.stat-card {
+    padding: 20px 22px;
+}
+
+.stat-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    color: var(--slate-500);
+    margin-bottom: 8px;
+}
+
+.stat-value {
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1;
+}
+
+.stat-sub {
+    font-size: 12px;
+    color: var(--slate-500);
+    margin-top: 6px;
+}
+
+.stat-card.dark {
+    background: var(--slate-900);
+    border-color: var(--slate-900);
+}
+
+.stat-card.dark .stat-label {
+    color: rgba(255, 255, 255, .45);
+}
+
+.stat-card.dark .stat-value {
+    color: #fff;
+}
+
+.stat-card.dark .stat-sub {
+    color: rgba(255, 255, 255, .35);
+}

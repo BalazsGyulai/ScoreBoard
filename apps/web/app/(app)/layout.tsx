@@ -11,7 +11,7 @@ export default function AppLayout({
 
       <Navigation />
 
-      <main className="appContent">
+      <main className={styles.page}>
         {children}
       </main>
     </div>

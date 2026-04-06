@@ -5,3 +5,9 @@
    width: 100vw;
    min-height: 100vh;
  }
+
+ .page {
+   max-width: 1100px;
+   margin: 0 auto;
+   padding: 92px 24px 60px;
+ }
