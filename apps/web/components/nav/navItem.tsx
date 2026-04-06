@@ -1,11 +1,13 @@
+import type { Route } from "next"
+import Link from "next/link"
 import styles from "./navItem.module.css"
 
-export default function NavItem({active = false, title, onClick = () => {}}: {
+export default function NavItem({active = false, title, href = "/"}: {
     active?: boolean,
     title: string,
-    onClick?: React.MouseEventHandler
+    href?: Route,
 }) {
     return (
-        <button className={`${styles["nav-item"]} ${active && styles["active"]}`} onClick={onClick}>{title}</button>
+        <Link href={href} className={`${styles["nav-item"]} ${active ? styles["active"] : ""}`}>{title}</Link>
     )
 }

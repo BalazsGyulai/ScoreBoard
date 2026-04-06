@@ -24,9 +24,9 @@ export default function Navigation() {
 
                     <div className={styles["nav-sep"]}></div>
 
-                    <NavItem title="Dashboard" active={activePage === "dashboard"} onClick={() => setActivePage("dashboard")} />
-                    <NavItem title="Játékok" active={activePage === "games"} onClick={() => setActivePage("games")}/>
-                    <NavItem title="Statisztika" active={activePage === "statistics"} onClick={() => setActivePage("statistics")}/>
+                    <NavItem title="Dashboard" active={activePage === "dashboard"} href="/dashboard" />
+                    <NavItem title="Játékok" active={activePage === "games"} href="/games" />
+                    <NavItem title="Statisztika" active={activePage === "statistics"} href="/"/>
 
                     <div className={styles["nav-sep"]}></div>
 
