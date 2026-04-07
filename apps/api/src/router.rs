@@ -9,7 +9,7 @@ use tower_http::cors::CorsLayer;
 pub fn build(state: AppState) -> Router {
     let cors = CorsLayer::new()
         .allow_origin(["http://localhost:3000".parse().unwrap()])
-        .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE, Method::OPTIONS])
+        .allow_methods([Method::GET, Method::POST, Method::PUT, Method::PATCH, Method::DELETE, Method::OPTIONS])
         // Wildcards are forbidden when allow_credentials is true — list headers explicitly
         .allow_headers([CONTENT_TYPE, AUTHORIZATION])
         .allow_credentials(true); // required for HttpOnly cookies to be sent cross-origin
@@ -26,7 +26,10 @@ pub fn build(state: AppState) -> Router {
             "/players",
             get(players::handlers::list_players).post(players::handlers::add_player),
         )
-        .route("/players/{id}", delete(players::handlers::delete_player))
+        .route(
+            "/players/{id}",
+            delete(players::handlers::delete_player).patch(players::handlers::update_player),
+        )
 
         // ── Games ─────────────────────────────────────────────────────────────
         .route(

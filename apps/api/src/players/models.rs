@@ -19,3 +19,10 @@ pub struct AddPlayerRequest {
     pub email: String,
     pub password: String,
 }
+
+#[derive(Debug, Deserialize)]
+pub struct UpdatePlayerRequest {
+    pub email: Option<String>,
+    pub password: Option<String>,
+    pub password2: Option<String>,
+}

@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import useSWR from "swr";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { LogOut, X, Eye, Loader2, Plus } from "lucide-react";
-import type { ApiError, ApiPlayer } from "@/types/api";
+import type { ApiError, ApiGame, ApiPlayer, ApiScoreRow } from "@/types/api";
 import { readHiddenPlayerIds, writeHiddenPlayerIds } from "@/lib/playerVisibility";
 import styles from "./sidebarSettings.module.css";
 
@@ -15,6 +16,7 @@ export default function SidebarSettins({
 }: {
     onClose?: React.MouseEventHandler<HTMLElement>;
 }) {
+    const pathname = usePathname();
     const [visibility, setVisibility] = useState<Record<string, boolean>>({});
     const [isPending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
@@ -33,6 +35,37 @@ export default function SidebarSettins({
         revalidateOnReconnect: false,
         revalidateIfStale: false,
     });
+    const { data: games } = useSWR<ApiGame[]>("/api/games", fetchJson, {
+        revalidateOnFocus: false,
+        revalidateOnReconnect: false,
+        revalidateIfStale: false,
+    });
+
+    const activeGame = useMemo(() => {
+        const pathParts = pathname.split("/").filter(Boolean);
+        const gameNameIdx = pathParts.findIndex((part) => part === "games");
+        const gameSlugFromUrl = gameNameIdx >= 0 ? decodeURIComponent(pathParts[gameNameIdx + 1] ?? "") : "";
+
+        const slugify = (name: string) => name.trim().toLowerCase();
+        const gameFromSubgamePage =
+            gameSlugFromUrl.length > 0
+                ? games?.find((game) => slugify(game.name) === slugify(gameSlugFromUrl))
+                : undefined;
+
+        return gameFromSubgamePage ?? games?.find((game) => game.status === "open") ?? null;
+    }, [games, pathname]);
+
+    const {
+        data: scoreRows,
+    } = useSWR<ApiScoreRow[]>(
+        activeGame ? `/api/games/${activeGame.id}/scores` : null,
+        fetchJson,
+        {
+            revalidateOnFocus: false,
+            revalidateOnReconnect: false,
+            revalidateIfStale: false,
+        },
+    );
 
     useEffect(() => {
         if (!players?.length) return;
@@ -49,6 +82,44 @@ export default function SidebarSettins({
     const orderedPlayers = (players ?? []).slice().sort((a, b) =>
         a.username.localeCompare(b.username, "hu"),
     );
+    const visiblePlayers = orderedPlayers.filter((p) => visibility[p.id] ?? true);
+    const totalRounds = scoreRows ? new Set(scoreRows.map((s) => s.round)).size : 0;
+
+    const winnerPreview = useMemo(() => {
+        if (!activeGame || !scoreRows || scoreRows.length === 0 || visiblePlayers.length === 0) {
+            return "Még nincs pont";
+        }
+
+        const totals = new Map<string, number>();
+        for (const row of scoreRows) {
+            totals.set(row.user_id, (totals.get(row.user_id) ?? 0) + row.value);
+        }
+
+        const scoredVisiblePlayers = visiblePlayers
+            .map((player) => ({
+                username: player.username,
+                total: totals.get(player.id),
+            }))
+            .filter((player) => typeof player.total === "number") as { username: string; total: number }[];
+
+        if (scoredVisiblePlayers.length === 0) {
+            return "Még nincs pont";
+        }
+
+        const leader = scoredVisiblePlayers.reduce((best, current) => {
+            if (activeGame.winner_rule === "min") {
+                return current.total < best.total ? current : best;
+            }
+            return current.total > best.total ? current : best;
+        });
+
+        const ruleText = activeGame.winner_rule === "min" ? "minimum" : "maximum";
+        return `${leader.username} (${leader.total} pont, ${ruleText})`;
+    }, [activeGame, scoreRows, visiblePlayers]);
+
+    const formattedCreatedAt = activeGame
+        ? new Date(activeGame.created_at).toLocaleDateString("hu-HU")
+        : "—";
 
     function togglePlayer(userId: string) {
         setVisibility((prev) => {
@@ -93,7 +164,7 @@ export default function SidebarSettins({
                 const res = await fetch("/api/auth/logout", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                            credentials: "include",
+                    credentials: "include",
                 });
 
                 if (res.ok) {
@@ -178,27 +249,33 @@ export default function SidebarSettins({
                 </div>
 
                 {/* ── Active game info ── */}
-                {/* <div className={styles["active-section"]}>
+                <div className={styles["active-section"]}>
                     <div className={styles["s-label"]}>Aktív játék adatai</div>
                     <div className={styles["s-row"]}>
                         <span className={styles["s-row-name"]}>Játék</span>
                         <span className={`${styles["s-row-val"]} ${styles.orange}`}>
-                            Skyjo
+                            {activeGame ? `${activeGame.icon} ${activeGame.name}` : "Nincs aktív játék"}
                         </span>
                     </div>
                     <div className={styles["s-row"]}>
-                        <span className={styles["s-row-name"]}>Ponthatár</span>
-                        <span className={styles["s-row-val"]}>100 pont</span>
+                        <span className={styles["s-row-name"]}>Szabály</span>
+                        <span className={styles["s-row-val"]}>
+                            {activeGame ? (activeGame.winner_rule === "min" ? "Minimum nyer" : "Maximum nyer") : "—"}
+                        </span>
                     </div>
                     <div className={styles["s-row"]}>
                         <span className={styles["s-row-name"]}>Dátum</span>
-                        <span className={styles["s-row-val"]}>2026.04.05</span>
+                        <span className={styles["s-row-val"]}>{formattedCreatedAt}</span>
                     </div>
                     <div className={styles["s-row"]}>
                         <span className={styles["s-row-name"]}>Körök</span>
-                        <span className={styles["s-row-val"]}>4</span>
+                        <span className={styles["s-row-val"]}>{totalRounds}</span>
                     </div>
-                </div> */}
+                    <div className={styles["s-row"]}>
+                        <span className={styles["s-row-name"]}>Várható győztes</span>
+                        <span className={styles["s-row-val"]}>{winnerPreview}</span>
+                    </div>
+                </div>
 
                 {/* ── Actions ── */}
                 <div className={styles.actions}>
@@ -210,7 +287,7 @@ export default function SidebarSettins({
                     </button> */}
                     <button onClick={() => handleSignOut()} className={`${styles.btn} ${styles["btn-danger"]}`}>
                         {
-                            isPending ? <Loader2 size={18} className={styles.spinner}/> : <>
+                            isPending ? <Loader2 size={18} className={styles.spinner} /> : <>
                                 <LogOut size={13} />
                                 Kijelentkezés
                             </>

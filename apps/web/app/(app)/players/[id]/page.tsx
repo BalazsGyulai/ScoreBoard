@@ -1,10 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import useSWR from "swr";
+import useSWR, { mutate } from "swr";
+import { AtSign, Shield, X } from "lucide-react";
+import { createPortal } from "react-dom";
 import StatisticCard from "@/components/ui/statisticCard";
 import ActionButton from "@/components/ui/actionButton";
+import Input from "@/components/ui/input";
+import Button from "@/components/ui/button";
+import { handleStringChange } from "@/lib/utils";
 import type { ApiGame, ApiPlayer } from "@/types/api";
 import styles from "./player.module.css";
 
@@ -50,6 +55,11 @@ type PlayerDerivedData = {
   activityLabels: string[];
   rivals: RivalRow[];
   bestGameName: string;
+};
+
+type MeResponse = {
+  user_id: string;
+  role: string;
 };
 
 async function fetchJson<T>(url: string): Promise<T> {
@@ -109,6 +119,7 @@ export default function PlayerPage() {
   }, [availableYears, selectedYearValue]);
 
   const { data: players } = useSWR<ApiPlayer[]>("/api/players", fetchJson);
+  const { data: me } = useSWR<MeResponse>("/api/auth/me", fetchJson);
   const { data: leaderboardRows } = useSWR<LeaderboardRow[]>(
     `/api/dashboard/leaderboard?year=${selectedYear}`,
     fetchJson,
@@ -274,6 +285,20 @@ export default function PlayerPage() {
   const gameBreakdown = derivedData?.gameBreakdown ?? [];
   const rivals = derivedData?.rivals ?? [];
   const actMax = Math.max(...activityData, 1);
+  const selectedPlayer = players?.find((p) => p.id === selected?.id) ?? null;
+  const canEditAccount = !!selected && !!me && (me.role === "leader" || me.user_id === selected.id);
+  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
+  const [accountEmail, setAccountEmail] = useState("");
+  const [accountPassword, setAccountPassword] = useState("");
+  const [accountPassword2, setAccountPassword2] = useState("");
+  const [accountError, setAccountError] = useState<string | null>(null);
+  const [accountSuccess, setAccountSuccess] = useState<string | null>(null);
+  const [isUpdatingAccount, setIsUpdatingAccount] = useState(false);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   function prev() {
     if (!orderedRows.length) return;
@@ -313,6 +338,91 @@ export default function PlayerPage() {
     if (target !== undefined) setSelectedYear(String(target));
   }
 
+  function openAccountModal() {
+    setAccountEmail(selectedPlayer?.email ?? "");
+    setAccountPassword("");
+    setAccountPassword2("");
+    setAccountError(null);
+    setAccountSuccess(null);
+    setIsAccountModalOpen(true);
+  }
+
+  function closeAccountModal() {
+    setIsAccountModalOpen(false);
+  }
+
+  async function handleAccountUpdate() {
+    if (!selected) return;
+
+    const trimmedEmail = accountEmail.trim();
+    const currentEmail = (selectedPlayer?.email ?? "").trim();
+    const emailChanged = trimmedEmail !== currentEmail;
+    const hasPassword = accountPassword.length > 0 || accountPassword2.length > 0;
+    setAccountError(null);
+    setAccountSuccess(null);
+
+    if (!emailChanged && !hasPassword) {
+      setAccountError("Nincs menthető módosítás.");
+      return;
+    }
+
+    if (emailChanged && !trimmedEmail) {
+      setAccountError("Az email nem lehet üres.");
+      return;
+    }
+
+    if (hasPassword) {
+      if (accountPassword !== accountPassword2) {
+        setAccountError("A jelszavak nem egyeznek.");
+        return;
+      }
+      if (accountPassword.length < 8) {
+        setAccountError("A jelszónak legalább 8 karakter hosszúnak kell lennie.");
+        return;
+      }
+    }
+
+    setIsUpdatingAccount(true);
+    try {
+      const payload: { email?: string; password?: string; password2?: string } = {};
+      if (emailChanged) {
+        payload.email = trimmedEmail;
+      }
+      if (hasPassword) {
+        payload.password = accountPassword;
+        payload.password2 = accountPassword2;
+      }
+
+      const res = await fetch(`/api/players/${selected.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        let message = "Mentés sikertelen";
+        try {
+          const data = (await res.json()) as { error?: string };
+          message = data.error ?? message;
+        } catch {
+          // ignore parse errors
+        }
+        setAccountError(message);
+        return;
+      }
+
+      setAccountSuccess("Fiók adatai sikeresen frissítve.");
+      setAccountPassword("");
+      setAccountPassword2("");
+      await mutate("/api/players");
+    } catch {
+      setAccountError("Nem sikerült csatlakozni a szerverhez.");
+    } finally {
+      setIsUpdatingAccount(false);
+    }
+  }
+
   return (
     <div className="view">
       {/* ── Header ── */}
@@ -347,6 +457,9 @@ export default function PlayerPage() {
           </select>
           
           <ActionButton text="Következő →" variant="ghost" onClick={next} />
+          {canEditAccount && (
+            <ActionButton text="Fiók szerkesztése" variant="ghost" onClick={openAccountModal} />
+          )}
         </div>
       </div>
 
@@ -502,6 +615,67 @@ export default function PlayerPage() {
           </div>
         </div>
       </div>
+
+      {isClient &&
+        isAccountModalOpen &&
+        selected &&
+        createPortal(
+          <div className={styles["modal-overlay"]}>
+            <div className={styles["modal-backdrop"]} onClick={closeAccountModal} />
+            <div className={styles["modal-panel"]}>
+              <button className={styles["modal-close"]} onClick={closeAccountModal}>
+                <X size={14} />
+              </button>
+              <h2>Fiók szerkesztése</h2>
+              <p className={styles["modal-subtitle"]}>
+                {selected.username} adatai: email frissítés és opcionális jelszócsere.
+              </p>
+
+              <div className={styles["modal-fields"]}>
+                <div className={styles["modal-static-field"]}>
+                  <div className={styles["modal-static-label"]}>Felhasználónév</div>
+                  <div className={styles["modal-static-value"]}>{selected.username}</div>
+                </div>
+                <Input
+                  id="account-email"
+                  title="Email"
+                  type="email"
+                  placeholder="e.g. myemail@email.com"
+                  icon={<AtSign size={16} />}
+                  value={accountEmail}
+                  onChange={handleStringChange(setAccountEmail)}
+                />
+                <Input
+                  id="account-password"
+                  title="Új jelszó (opcionális)"
+                  type="password"
+                  placeholder="Legalább 8 karakter"
+                  icon={<Shield size={16} />}
+                  value={accountPassword}
+                  onChange={handleStringChange(setAccountPassword)}
+                />
+                <Input
+                  id="account-password2"
+                  title="Új jelszó megerősítése"
+                  type="password"
+                  placeholder="Legalább 8 karakter"
+                  icon={<Shield size={16} />}
+                  value={accountPassword2}
+                  onChange={handleStringChange(setAccountPassword2)}
+                />
+              </div>
+
+              {accountError && <p className={styles["modal-error"]}>{accountError}</p>}
+              {accountSuccess && <p className={styles["modal-success"]}>{accountSuccess}</p>}
+
+              <div className={styles["modal-actions"]}>
+                <ActionButton text="Mégse" variant="ghost" onClick={closeAccountModal} />
+                <Button text="Mentés" onClick={handleAccountUpdate} disabled={isUpdatingAccount} />
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

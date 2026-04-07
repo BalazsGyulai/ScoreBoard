@@ -6,7 +6,7 @@ use axum::{
 };
 use uuid::Uuid;
 
-use super::models::{AddPlayerRequest, Player};
+use super::models::{AddPlayerRequest, Player, UpdatePlayerRequest};
 use crate::{auth::middleware::AuthUser, AppState};
 
 // GET /players — list all members of the caller's group
@@ -95,6 +95,93 @@ pub async fn delete_player(
     match result {
         Ok(r) if r.rows_affected() > 0 => StatusCode::NO_CONTENT.into_response(),
         Ok(_) => StatusCode::NOT_FOUND.into_response(),
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
+}
+
+// PATCH /players/:id — update email and/or password (leader: anyone, member: self)
+pub async fn update_player(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(body): Json<UpdatePlayerRequest>,
+) -> Response {
+    let can_edit = auth.role == "leader" || auth.user_id == id;
+    if !can_edit {
+        return (StatusCode::FORBIDDEN, Json(serde_json::json!({ "error": "You can only edit your own account" }))).into_response();
+    }
+
+    let email = body.email.as_deref().map(str::trim).filter(|v| !v.is_empty());
+    let password = body.password.unwrap_or_default();
+    let password2 = body.password2.unwrap_or_default();
+    let has_password_update = !password.is_empty() || !password2.is_empty();
+
+    if email.is_none() && !has_password_update {
+        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": "Email or password update is required" }))).into_response();
+    }
+
+    let pass_hash = if has_password_update {
+        if password != password2 {
+            return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": "Passwords do not match" }))).into_response();
+        }
+        if password.len() < 8 {
+            return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": "Password must be at least 8 characters" }))).into_response();
+        }
+        match bcrypt::hash(&password, 10) {
+            Ok(h) => Some(h),
+            Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        }
+    } else {
+        None
+    };
+
+    let result = match (email, pass_hash.as_deref()) {
+        (Some(next_email), Some(next_hash)) => {
+            sqlx::query!(
+                r#"UPDATE users
+                   SET email = $1, pass_hash = $2
+                   WHERE id = $3 AND group_id = $4"#,
+                next_email.to_lowercase(),
+                next_hash,
+                id,
+                auth.group_id,
+            )
+            .execute(&state.db)
+            .await
+        }
+        (Some(next_email), None) => {
+            sqlx::query!(
+                r#"UPDATE users
+                   SET email = $1
+                   WHERE id = $2 AND group_id = $3"#,
+                next_email.to_lowercase(),
+                id,
+                auth.group_id,
+            )
+            .execute(&state.db)
+            .await
+        }
+        (None, Some(next_hash)) => {
+            sqlx::query!(
+                r#"UPDATE users
+                   SET pass_hash = $1
+                   WHERE id = $2 AND group_id = $3"#,
+                next_hash,
+                id,
+                auth.group_id,
+            )
+            .execute(&state.db)
+            .await
+        }
+        (None, None) => return StatusCode::BAD_REQUEST.into_response(),
+    };
+
+    match result {
+        Ok(r) if r.rows_affected() > 0 => StatusCode::NO_CONTENT.into_response(),
+        Ok(_) => StatusCode::NOT_FOUND.into_response(),
+        Err(e) if e.to_string().contains("unique") => {
+            (StatusCode::CONFLICT, Json(serde_json::json!({ "error": "Email already in use" }))).into_response()
+        }
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
 }
