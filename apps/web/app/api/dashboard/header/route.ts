@@ -1,0 +1,79 @@
+import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { serverFetch } from "@/lib/api/server";
+import type { ApiGame, ApiPlayer, ApiScoreRow } from "@/types/api";
+
+function formatLastPlayed(date: Date | null) {
+  if (!date) return "nincs adat";
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  if (diffDays <= 0) return "ma";
+  if (diffDays === 1) return "tegnap";
+  return `${diffDays} napja`;
+}
+
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  const parts = token.split(".");
+  if (parts.length < 2) return null;
+  try {
+    const payloadBase64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = payloadBase64.padEnd(
+      payloadBase64.length + ((4 - (payloadBase64.length % 4)) % 4),
+      "=",
+    );
+    const json = Buffer.from(padded, "base64").toString("utf-8");
+    return JSON.parse(json) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+export async function GET() {
+  try {
+    const jar = await cookies();
+    const token = jar.get("hg_access_token")?.value;
+    const claims = token ? decodeJwtPayload(token) : null;
+    const currentUserId =
+      claims && typeof claims.sub === "string" ? claims.sub : null;
+
+    const [games, players] = await Promise.all([
+      serverFetch<ApiGame[]>("/games"),
+      serverFetch<ApiPlayer[]>("/players"),
+    ]);
+
+    const latestScoreDates = await Promise.all(
+      games.map(async (game) => {
+        const scores = await serverFetch<ApiScoreRow[]>(`/games/${game.id}/scores`);
+        if (!scores.length) return null;
+        const latest = scores.reduce((best, row) =>
+          new Date(row.recorded_at).getTime() > new Date(best.recorded_at).getTime()
+            ? row
+            : best,
+        );
+        return new Date(latest.recorded_at);
+      }),
+    );
+
+    const latestPlayed =
+      latestScoreDates
+        .filter((d): d is Date => d !== null)
+        .reduce<Date | null>((best, current) => {
+          if (!best) return current;
+          return current.getTime() > best.getTime() ? current : best;
+        }, null) ?? null;
+    const currentUser =
+      players.find((player) => player.id === currentUserId)?.username ??
+      "Jatekos";
+
+    return NextResponse.json({
+      username: currentUser,
+      games: games.length,
+      players: players.length,
+      lastPlayed: formatLastPlayed(latestPlayed),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Nem sikerult betolteni";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
