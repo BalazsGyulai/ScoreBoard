@@ -150,7 +150,7 @@ export default function SidebarSettins({
                 </div>
 
                 {/* ── Active game info ── */}
-                <div className={styles["active-section"]}>
+                {/* <div className={styles["active-section"]}>
                     <div className={styles["s-label"]}>Aktív játék adatai</div>
                     <div className={styles["s-row"]}>
                         <span className={styles["s-row-name"]}>Játék</span>
@@ -170,16 +170,16 @@ export default function SidebarSettins({
                         <span className={styles["s-row-name"]}>Körök</span>
                         <span className={styles["s-row-val"]}>4</span>
                     </div>
-                </div>
+                </div> */}
 
                 {/* ── Actions ── */}
                 <div className={styles.actions}>
-                    <button
+                    {/* <button
                         className={`${styles.btn} ${styles["btn-dark"]}`}
                         onClick={onClose}
                     >
                         Mentés &amp; bezárás
-                    </button>
+                    </button> */}
                     <button onClick={() => handleSignOut()} className={`${styles.btn} ${styles["btn-danger"]}`}>
                         {
                             isPending ? <Loader2 size={18} className={styles.spinner}/> : <>
