@@ -17,9 +17,9 @@ export default function Navigation() {
     ? "games"
     : pathname.startsWith("/stats")
       ? "stats"
-      : pathname.startsWith("/players")
-        ? "stats"
-        : "dashboard";
+      : pathname.startsWith("/dashboard")
+        ? "dashboard"
+        : "";
 
   return (
     <>

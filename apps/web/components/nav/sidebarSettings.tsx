@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useTransition } from "react";
 import useSWR from "swr";
-import { LogOut, X, Eye, Loader2 } from "lucide-react";
+import Link from "next/link";
+import { LogOut, X, Eye, Loader2, Plus } from "lucide-react";
 import type { ApiError, ApiPlayer } from "@/types/api";
 import { avatarColors } from "@/lib/mockData";
 import styles from "./sidebarSettings.module.css";
@@ -114,7 +115,17 @@ export default function SidebarSettins({
 
                 {/* ── Players ── */}
                 <div className={styles["s-section"]}>
-                    <div className={styles["s-label"]}>Játékosok</div>
+                    <div className={styles["s-label"]}>
+                        <span>Játékosok</span>
+                        <Link
+                            href="/players/new"
+                            className={styles["pt-eye"]}
+                            title="Új játékos"
+                            aria-label="Új játékos"
+                        >
+                            <Plus size={14} />
+                        </Link>
+                    </div>
                     {playersLoading ? (
                         <div className={styles["pt-row"]}>
                             <Loader2 size={14} className={styles.spinner} />

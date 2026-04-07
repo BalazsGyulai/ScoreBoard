@@ -197,6 +197,15 @@ pub async fn close_game(
         Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     };
 
+    // Remove any previous results (e.g. from a prior close before restart)
+    if sqlx::query!("DELETE FROM game_results WHERE game_id = $1", game_id)
+        .execute(&mut *tx)
+        .await
+        .is_err()
+    {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    }
+
     for r in &results {
         let res = sqlx::query!(
             "INSERT INTO game_results (game_id, user_id, total_score, place) VALUES ($1, $2, $3, $4)",

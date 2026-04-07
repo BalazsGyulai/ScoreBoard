@@ -260,8 +260,10 @@ export default function ActiveGamePage() {
       return;
     }
 
-    // Refresh game data (status will now be 'closed')
+    // Refresh game data (status will now be 'closed') and related caches
     await mutate("/api/games");
+    await mutate(`/api/games/${game.id}/scores`);
+    await mutate("/api/stats");
     await Promise.all(dashboardCacheKeys.map((key) => mutate(key)));
   }
 

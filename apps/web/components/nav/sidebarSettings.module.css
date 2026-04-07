@@ -89,12 +89,17 @@
 }
 
 .s-label {
+    position: relative;
     font-size: 10.5px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: .08em;
     color: var(--slate-500);
+    margin-top: 12px;
     margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
 }
 
 .s-row {
