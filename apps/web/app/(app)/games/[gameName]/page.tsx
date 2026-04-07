@@ -7,6 +7,7 @@ import {
   Trash2,
   Check,
   Plus,
+  PlusIcon,
 } from "lucide-react";
 import ActionButton from "@/components/ui/actionButton";
 import Input from "@/components/ui/input";
@@ -118,9 +119,9 @@ export default function ActiveGamePage() {
     !game || nonZeroTotals.length === 0
       ? null
       : nonZeroTotals.reduce((a, b) => {
-          if (game.winner_rule === "min") return a.t <= b.t ? a : b;
-          return a.t >= b.t ? a : b;
-        }).idx;
+        if (game.winner_rule === "min") return a.t <= b.t ? a : b;
+        return a.t >= b.t ? a : b;
+      }).idx;
 
   const leaderName = leaderIdx === null ? null : orderedPlayers[leaderIdx]?.username ?? null;
   const leaderTotal = leaderIdx === null ? null : totals[leaderIdx] ?? null;
@@ -129,8 +130,8 @@ export default function ActiveGamePage() {
     !game || nonZeroTotals.length === 0
       ? null
       : (game.winner_rule === "min"
-          ? Math.min(...nonZeroTotals.map((x) => x.t))
-          : Math.max(...nonZeroTotals.map((x) => x.t)));
+        ? Math.min(...nonZeroTotals.map((x) => x.t))
+        : Math.max(...nonZeroTotals.map((x) => x.t)));
   const worstTotal =
     nonZeroTotals.length === 0 ? null : Math.max(...nonZeroTotals.map((x) => x.t));
 
@@ -185,6 +186,7 @@ export default function ActiveGamePage() {
   }
 
   function startEdit(round: number, userId: string) {
+    if (game?.status === "closed") return;
     setEditingCell({ round, userId });
     setTimeout(() => editRef.current?.select(), 0);
   }
@@ -235,9 +237,57 @@ export default function ActiveGamePage() {
     }
   }
 
-  function finishGame() {
-    // Not implemented in Rust yet — keep the UI button but avoid misleading behavior.
-    alert("Hamarosan… (nincs még API a meccs lezárására)");
+  async function finishGame() {
+    if (!game) return;
+    if (!confirm("Biztosan le akarod zárni a meccset?")) return;
+
+    const res = await fetch(`/api/games/${game.id}/close`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+    });
+
+    if (!res.ok) {
+      let message = `Hiba (${res.status})`;
+      try {
+        const data = (await res.json()) as Partial<ApiError>;
+        message = data.error ?? message;
+      } catch {
+        // ignore parse errors
+      }
+      alert(message);
+      return;
+    }
+
+    // Refresh game data (status will now be 'closed')
+    await mutate("/api/games");
+  }
+
+  async function restartGame() {
+    if (!game) return;
+    if (!confirm("Új játékot indítasz — a korábbi eredmények megmaradnak. Folytatod?")) return;
+
+    const res = await fetch(`/api/games/${game.id}/restart`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+    });
+
+    if (!res.ok) {
+      let message = `Hiba (${res.status})`;
+      try {
+        const data = (await res.json()) as Partial<ApiError>;
+        message = data.error ?? message;
+      } catch {
+        // ignore parse errors
+      }
+      alert(message);
+      return;
+    }
+
+    // Refresh everything — game is open again with no scores
+    await mutate("/api/games");
+    if (game) await mutate(`/api/games/${game.id}/scores`);
   }
 
   return (
@@ -269,7 +319,7 @@ export default function ActiveGamePage() {
               "Nincs ilyen játék ebben a csoportban."
             ) : (
               <>
-                {orderedPlayers.length} játékos · Folyamatban &nbsp;·&nbsp;{" "}
+                {orderedPlayers.length} játékos · {game?.status === "closed" ? "Lezárva" : "Folyamatban"} &nbsp;·&nbsp;{" "}
                 {leaderName && leaderTotal !== null ? (
                   <span className={styles.orange} style={{ fontWeight: 500 }}>
                     🏆 Vezet: {leaderName} ({leaderTotal} pont)
@@ -284,22 +334,28 @@ export default function ActiveGamePage() {
           </div>
         </div>
         <div className={styles["game-actions"]}>
-          <ActionButton
-            text="Beállítások"
-            variant="ghost"
-            icon={<Settings size={13} />}
-          />
-          <ActionButton
+          {/* <ActionButton
             text="Töröl"
             variant="danger"
             icon={<Trash2 size={13} />}
-          />
-          <ActionButton
-            text="Meccs lezárása"
-            variant="amber"
-            icon={<Check size={13} />}
-            onClick={finishGame}
-          />
+          /> */}
+
+          {game?.status === "closed" && (
+            <ActionButton
+              text="Új játék"
+              variant="ghost"
+              icon={<PlusIcon size={13} />}
+              onClick={restartGame}
+            />
+          )}
+          {game?.status !== "closed" && (
+            <ActionButton
+              text="Meccs lezárása"
+              variant="amber"
+              icon={<Check size={13} />}
+              onClick={finishGame}
+            />
+          )}
         </div>
       </div>
 
@@ -343,23 +399,25 @@ export default function ActiveGamePage() {
                 <td />
               </tr>
 
-              {/* Input row */}
-              <tr className={styles["input-row"]}>
-                <td>Új kör</td>
-                {orderedPlayers.map((p) => (
-                  <td key={p.id}>
-                    <Input
-                      naked
-                      className={styles["round-inp"]}
-                      type="number"
-                      id={`inp_${p.id}`}
-                      placeholder="—"
-                      min={0}
-                    />
-                  </td>
-                ))}
-                <td />
-              </tr>
+              {/* Input row — only for open games */}
+              {game?.status !== "closed" && (
+                <tr className={styles["input-row"]}>
+                  <td>Új kör</td>
+                  {orderedPlayers.map((p) => (
+                    <td key={p.id}>
+                      <Input
+                        naked
+                        className={styles["round-inp"]}
+                        type="number"
+                        id={`inp_${p.id}`}
+                        placeholder="—"
+                        min={0}
+                      />
+                    </td>
+                  ))}
+                  <td />
+                </tr>
+              )}
 
               {/* Data rows */}
               {roundNumbers.map((roundNo, ri) => (
@@ -420,17 +478,21 @@ export default function ActiveGamePage() {
               <strong>{rounds.length}</strong> kör lejátszva
             </span>
             <div style={{ display: "flex", gap: 8 }}>
-              <ActionButton
-                text="Mégse"
-                variant="ghost"
-                onClick={clearInputRow}
-              />
-              <ActionButton
-                text="Kör mentése"
-                variant="dark"
-                icon={<Plus size={13} />}
-                onClick={commitRound}
-              />
+              {game?.status !== "closed" && (
+                <>
+                  <ActionButton
+                    text="Mégse"
+                    variant="ghost"
+                    onClick={clearInputRow}
+                  />
+                  <ActionButton
+                    text="Kör mentése"
+                    variant="dark"
+                    icon={<Plus size={13} />}
+                    onClick={commitRound}
+                  />
+                </>
+              )}
             </div>
           </div>
         </div>

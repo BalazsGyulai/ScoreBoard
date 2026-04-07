@@ -72,8 +72,9 @@ export default function GamesPage() {
                                 Kör: {g.current_round} · Szabály:{" "}
                                 {g.winner_rule === "min" ? "Minimum" : "Maximum"}
                             </div>
-                            <span className={`${styles.badge} ${styles["badge-green"]}`}>
-                                ✓ Elérhető
+                            <span className={`${styles.badge} ${g.status === "closed" ? styles["badge-green"] : styles["badge-amber"]}`}>
+                                {g.status === "closed" ? "✓ Lezárt" : "● Aktív"}
+                                
                             </span>
                         </Link>
                     ))

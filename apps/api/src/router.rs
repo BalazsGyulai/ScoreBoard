@@ -37,6 +37,9 @@ pub fn build(state: AppState) -> Router {
             get(games::handlers::get_game).delete(games::handlers::delete_game),
         )
 
+        .route("/games/{id}/close", post(games::handlers::close_game))
+        .route("/games/{id}/restart", post(games::handlers::restart_game))
+
         // ── Scores ────────────────────────────────────────────────────────────
         .route(
             "/games/{id}/scores",

@@ -87,7 +87,21 @@ export interface ApiGame {
   winner_rule:   WinnerRule;
   icon:          string;
   current_round: number;
+  status:        "open" | "closed";
+  closed_at:     string | null;
   created_at:    string;
+}
+
+export interface ApiGameResult {
+  user_id:     string;
+  username:    string;
+  total_score: number;
+  place:       number;
+}
+
+export interface CloseGameResponse {
+  game_id: string;
+  results: ApiGameResult[];
 }
 
 export interface CreateGameRequest {
