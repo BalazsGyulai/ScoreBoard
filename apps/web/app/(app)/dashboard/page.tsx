@@ -1,10 +1,56 @@
+"use client";
+
 import StatisticCard from "@/components/ui/statisticCard";
 import ScoreCard from "@/components/ui/scoreCard";
 import Link from "next/link";
+import useSWR from "swr";
 import { players, avatarColors, recentGames, streaks } from "@/lib/mockData";
 import styles from "./dashboard.module.css";
 
+type DashboardCardData = {
+  value: string;
+  subLabel: string;
+};
+
+async function fetchJson<T>(url: string): Promise<T> {
+  const res = await fetch(url, {
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    let message = `Hiba (${res.status})`;
+    try {
+      const data = (await res.json()) as { error?: string };
+      message = data.error ?? message;
+    } catch {
+      // ignore parse errors
+    }
+    throw new Error(message);
+  }
+
+  return res.json() as Promise<T>;
+}
+
 export default function Dashboard() {
+  const { data: winRateCard } = useSWR<DashboardCardData>(
+    "/api/dashboard/win-rate",
+    fetchJson,
+  );
+  const { data: totalMatchesCard } = useSWR<DashboardCardData>(
+    "/api/dashboard/total-matches",
+    fetchJson,
+  );
+  const { data: bestGameCard } = useSWR<DashboardCardData>(
+    "/api/dashboard/best-game",
+    fetchJson,
+  );
+  const { data: mostActiveCard } = useSWR<DashboardCardData>(
+    "/api/dashboard/most-active",
+    fetchJson,
+  );
+
   const sorted = [...players].sort(
     (a, b) => b.wins / b.games - a.wins / a.games,
   );
@@ -22,24 +68,24 @@ export default function Dashboard() {
       <div className={styles.stats4}>
         <StatisticCard
           label="Győzelmi arány"
-          value="68%"
-          subLabel="↑ 4% az elmúlt hónapban"
+          value={winRateCard?.value ?? "..."}
+          subLabel={winRateCard?.subLabel ?? "Betoltes..."}
           dark
         />
         <StatisticCard
           label="Összes meccs"
-          value="47"
-          subLabel="12 különböző játék"
+          value={totalMatchesCard?.value ?? "..."}
+          subLabel={totalMatchesCard?.subLabel ?? "Betoltes..."}
         />
         <StatisticCard
           label="Legjobb játék"
-          value="Skyjo 🃏"
-          subLabel="8/11 meccs megnyerve"
+          value={bestGameCard?.value ?? "..."}
+          subLabel={bestGameCard?.subLabel ?? "Betoltes..."}
         />
         <StatisticCard
           label="Legtöbb aktív"
-          value="Atis"
-          subLabel="47-ből 41 meccsen"
+          value={mostActiveCard?.value ?? "..."}
+          subLabel={mostActiveCard?.subLabel ?? "Betoltes..."}
         />
       </div>
 
