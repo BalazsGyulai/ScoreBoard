@@ -142,7 +142,7 @@ export default function SidebarSettins({
                             <div
                                 className={`${styles.avatar} ${styles.av36}`}
                                 style={{
-                                    background: avatarColors[i],
+                                    background: "#94A3B8",
                                     color: "#fff",
                                 }}
                             >
