@@ -9,6 +9,7 @@ import {
   Plus,
 } from "lucide-react";
 import ActionButton from "@/components/ui/actionButton";
+import Input from "@/components/ui/input";
 import styles from "./game.module.css";
 import { useParams } from "next/navigation";
 import useSWR, { mutate } from "swr";
@@ -216,7 +217,7 @@ export default function ActiveGamePage() {
       } catch {
         // ignore parse errors
       }
-      // alert(message);
+      alert(message);
       setEditingCell(null);
       return;
     }
@@ -347,7 +348,8 @@ export default function ActiveGamePage() {
                 <td>Új kör</td>
                 {orderedPlayers.map((p) => (
                   <td key={p.id}>
-                    <input
+                    <Input
+                      naked
                       className={styles["round-inp"]}
                       type="number"
                       id={`inp_${p.id}`}
@@ -373,8 +375,10 @@ export default function ActiveGamePage() {
                       <td key={p.id}>
                         {score ? (
                           isEditing ? (
-                            <input
-                              ref={editRef}
+                            <Input
+                              id={`edit_${score.id}`}
+                              naked
+                              inputRef={editRef}
                               className={styles["cell-edit"]}
                               type="number"
                               defaultValue={score.value}

@@ -125,23 +125,24 @@ pub async fn update_score(
     // This prevents editing other groups' scores by guessing UUIDs.
     let result = sqlx::query!(
         r#"
-        UPDATE scores s
+        UPDATE scores
         SET value = $1
-        FROM games g
-        WHERE s.id = $2
-          AND s.game_id = g.id
-          AND g.group_id = $3
+        FROM games
+        WHERE scores.id = $2
+          AND scores.game_id = games.id
+          AND games.group_id = $3
+        RETURNING scores.value
         "#,
         body.value,
         score_id,
         auth.group_id,
     )
-    .execute(&state.db)
+    .fetch_optional(&state.db)
     .await;
 
     match result {
-        Ok(r) if r.rows_affected() > 0 => StatusCode::NO_CONTENT.into_response(),
-        Ok(_) => StatusCode::NOT_FOUND.into_response(),
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        Ok(Some(_)) => Json(serde_json::json!({ "value": body.value })).into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "Score not found or access denied" }))).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() }))).into_response(),
     }
 }
