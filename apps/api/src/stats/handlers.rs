@@ -9,29 +9,29 @@ use super::models::PlayerStat;
 use crate::{auth::middleware::AuthUser, AppState};
 
 // GET /stats — overall leaderboard for the caller's group
-// Wins = rounds where the player had the best score (min or max depending on game rule)
+// Computed from immutable game_results snapshots (finished matches), not live scores.
 pub async fn leaderboard(auth: AuthUser, State(state): State<AppState>) -> Response {
     let result = sqlx::query!(
         r#"
-        WITH round_results AS (
+        WITH ranked_results AS (
             SELECT
-                s.user_id,
-                CASE
-                    WHEN g.winner_rule = 'min' THEN s.value = MIN(s.value) OVER (PARTITION BY s.game_id, s.round)
-                    ELSE                             s.value = MAX(s.value) OVER (PARTITION BY s.game_id, s.round)
-                END AS is_winner
-            FROM scores s
-            JOIN games g ON g.id = s.game_id
+                gr.snapshot_id,
+                gr.user_id,
+                gr.place,
+                MAX(gr.place) OVER (PARTITION BY gr.snapshot_id) AS worst_place,
+                COUNT(*) OVER (PARTITION BY gr.snapshot_id) AS player_count
+            FROM game_results gr
+            JOIN games g ON g.id = gr.game_id
             WHERE g.group_id = $1
         )
         SELECT
             u.id,
             u.username,
-            COALESCE(SUM(CASE WHEN rr.is_winner THEN 1 ELSE 0 END), 0) AS wins,
-            COALESCE(SUM(CASE WHEN NOT rr.is_winner THEN 1 ELSE 0 END), 0) AS losses,
-            COALESCE(COUNT(rr.user_id), 0) AS total_rounds
+            COALESCE(SUM(CASE WHEN rr.place = 1 THEN 1 ELSE 0 END), 0) AS wins,
+            COALESCE(SUM(CASE WHEN rr.player_count > 1 AND rr.worst_place > 1 AND rr.place = rr.worst_place THEN 1 ELSE 0 END), 0) AS losses,
+            COALESCE(COUNT(rr.snapshot_id), 0) AS total_rounds
         FROM users u
-        LEFT JOIN round_results rr ON rr.user_id = u.id
+        LEFT JOIN ranked_results rr ON rr.user_id = u.id
         WHERE u.group_id = $1
         GROUP BY u.id, u.username
         ORDER BY wins DESC, losses ASC

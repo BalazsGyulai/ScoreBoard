@@ -5,7 +5,7 @@ import useSWR from "swr";
 import Link from "next/link";
 import { LogOut, X, Eye, Loader2, Plus } from "lucide-react";
 import type { ApiError, ApiPlayer } from "@/types/api";
-import { avatarColors } from "@/lib/mockData";
+import { readHiddenPlayerIds, writeHiddenPlayerIds } from "@/lib/playerVisibility";
 import styles from "./sidebarSettings.module.css";
 
 export default function SidebarSettins({
@@ -28,10 +28,11 @@ export default function SidebarSettins({
 
     useEffect(() => {
         if (!players?.length) return;
+        const hiddenIds = readHiddenPlayerIds();
         setVisibility((prev) => {
             const next: Record<string, boolean> = {};
             for (const p of players) {
-                next[p.id] = prev[p.id] ?? true;
+                next[p.id] = prev[p.id] ?? !hiddenIds.has(p.id);
             }
             return next;
         });
@@ -45,6 +46,12 @@ export default function SidebarSettins({
         setVisibility((prev) => {
             const next = { ...prev };
             next[userId] = !next[userId];
+            const hiddenIds = new Set<string>(
+                Object.entries(next)
+                    .filter(([, isVisible]) => !isVisible)
+                    .map(([id]) => id),
+            );
+            writeHiddenPlayerIds(hiddenIds);
             return next;
         });
     }

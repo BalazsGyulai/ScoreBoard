@@ -50,7 +50,7 @@ export default function NewPlayerPage() {
 
                 if (res.ok) {
                     void mutate("/api/players");
-                    window.location.href = "/players";
+                    window.location.href = "/dashboard";
                 } else {
                     let message = "Játékos hozzáadása sikertelen";
                     try {

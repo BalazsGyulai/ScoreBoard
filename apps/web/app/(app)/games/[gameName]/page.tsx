@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Settings,
@@ -15,6 +15,7 @@ import styles from "./game.module.css";
 import { useParams } from "next/navigation";
 import useSWR, { mutate } from "swr";
 import { dashboardCacheKeys } from "@/lib/dashboard/cacheKeys";
+import { isPlayerVisible, readHiddenPlayerIds } from "@/lib/playerVisibility";
 import type {
   AddRoundRequest,
   ApiError,
@@ -63,6 +64,7 @@ export default function ActiveGamePage() {
   const slug = decodeURIComponent(params.gameName ?? "");
   const [editingCell, setEditingCell] = useState<{ round: number; userId: string } | null>(null);
   const editRef = useRef<HTMLInputElement>(null);
+  const [hiddenPlayerIds, setHiddenPlayerIds] = useState<Set<string>>(new Set());
 
   // Use the cached games list to resolve slug -> game id.
   const { data: games } = useSWR<ApiGame[]>("/api/games", fetchJson, {
@@ -96,7 +98,24 @@ export default function ActiveGamePage() {
     },
   );
 
-  const orderedPlayers = (players ?? []).slice().sort((a, b) =>
+  useEffect(() => {
+    const syncHiddenPlayers = () => {
+      setHiddenPlayerIds(readHiddenPlayerIds());
+    };
+
+    syncHiddenPlayers();
+    window.addEventListener("storage", syncHiddenPlayers);
+    window.addEventListener("focus", syncHiddenPlayers);
+    return () => {
+      window.removeEventListener("storage", syncHiddenPlayers);
+      window.removeEventListener("focus", syncHiddenPlayers);
+    };
+  }, []);
+
+  const orderedPlayers = (players ?? [])
+    .filter((player) => isPlayerVisible(player.id, hiddenPlayerIds))
+    .slice()
+    .sort((a, b) =>
     a.username.localeCompare(b.username, "hu"),
   );
 
