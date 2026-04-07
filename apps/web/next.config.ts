@@ -49,6 +49,14 @@ const nextConfig: NextConfig = {
         source: "/api/players",
         destination: `${API_URL}/players`,
       },
+      {
+        source: "/api/stats",
+        destination: `${API_URL}/stats`,
+      },
+      {
+        source: "/api/stats/history",
+        destination: `${API_URL}/stats/history`,
+      },
     ];
   },
 };

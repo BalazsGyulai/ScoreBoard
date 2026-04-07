@@ -65,6 +65,7 @@ pub async fn history(auth: AuthUser, State(state): State<AppState>) -> Response 
         r#"
         SELECT
             gr.snapshot_id,
+            gr.game_id,
             gr.user_id,
             gr.place,
             g.closed_at
@@ -85,6 +86,7 @@ pub async fn history(auth: AuthUser, State(state): State<AppState>) -> Response 
                 .into_iter()
                 .map(|r| PlayerPlacement {
                     snapshot_id: r.snapshot_id,
+                    game_id: r.game_id,
                     user_id: r.user_id,
                     place: r.place,
                     closed_at: r.closed_at.expect("closed_at filtered by query").to_rfc3339(),

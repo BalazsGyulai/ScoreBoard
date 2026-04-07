@@ -308,18 +308,21 @@ export default function StatsPage() {
                             justifyContent: "center",
                           }}
                         >
-                          {p.trend.map((h, bi) => (
-                            <div
-                              key={bi}
-                              style={{
-                                flex: 1,
-                                height: h * 3,
-                                borderRadius: "3px 3px 0 0",
-                                background: barColor,
-                                opacity: 0.4 + bi * 0.08,
-                              }}
-                            />
-                          ))}
+                          {(() => {
+                            const maxPlace = Math.max(...p.trend, 1);
+                            return p.trend.map((h, bi) => (
+                              <div
+                                key={bi}
+                                style={{
+                                  flex: 1,
+                                  height: Math.max(3, ((maxPlace - h + 1) / maxPlace) * 21),
+                                  borderRadius: "3px 3px 0 0",
+                                  background: barColor,
+                                  opacity: 0.4 + bi * 0.08,
+                                }}
+                              />
+                            ));
+                          })()}
                         </div>
                       </td>
                     </tr>

@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import useSWR from "swr";
 import StatisticCard from "@/components/ui/statisticCard";
 import ActionButton from "@/components/ui/actionButton";
-import type { ApiGame, ApiPlayer, ApiScoreRow } from "@/types/api";
+import type { ApiGame, ApiPlayer } from "@/types/api";
 import styles from "./player.module.css";
 
 type LeaderboardRow = {
@@ -20,6 +20,14 @@ type LeaderboardRow = {
 type SummaryTableRow = LeaderboardRow & {
   streak: number;
   trend: number[];
+};
+
+type ApiPlacement = {
+  snapshot_id: string;
+  game_id: string;
+  user_id: string;
+  place: number;
+  closed_at: string;
 };
 
 type RivalRow = {
@@ -85,10 +93,6 @@ function rivalColor(pct: number) {
   return "var(--danger)";
 }
 
-function winnerBetween(a: number, b: number, winnerRule: ApiGame["winner_rule"]) {
-  return winnerRule === "min" ? a < b : a > b;
-}
-
 export default function PlayerPage() {
   const params = useParams();
   const router = useRouter();
@@ -127,127 +131,138 @@ export default function PlayerPage() {
 
   const selected = orderedRows[selectedIndex] ?? null;
 
-  const { data: derivedData } = useSWR<PlayerDerivedData>(
-    selected && games
-      ? ["player-derived", selected.id, selectedYear, games.map((g) => g.id).join(",")]
-      : null,
-    async () => {
-      if (!selected || !games) {
-        return {
-          gameBreakdown: [],
-          activityData: [],
-          activityLabels: [],
-          rivals: [],
-          bestGameName: "N/A",
-        };
-      }
-
-      const scoreRowsByGame = await Promise.all(
-        games.map(async (game) => ({
-          game,
-          scores: await fetchJson<ApiScoreRow[]>(`/api/games/${game.id}/scores`),
-        })),
-      );
-
-      const gameBreakdown: GameBreakdownRow[] = [];
-      const monthlyCounts = new Map<string, number>();
-      const rivalDuelMap = new Map<string, { wins: number; total: number }>();
-
-      for (const { game, scores } of scoreRowsByGame) {
-        const rounds = new Map<number, ApiScoreRow[]>();
-        for (const s of scores) {
-          if (!rounds.has(s.round)) rounds.set(s.round, []);
-          rounds.get(s.round)!.push(s);
-        }
-
-        let wins = 0;
-        let losses = 0;
-        for (const roundScores of rounds.values()) {
-          const me = roundScores.find((r) => r.user_id === selected.id);
-          if (!me) continue;
-          const playedAt = new Date(me.recorded_at);
-          if (selectedYearValue !== null && playedAt.getFullYear() !== selectedYearValue) {
-            continue;
-          }
-          const key = `${playedAt.getFullYear()}-${playedAt.getMonth()}`;
-          monthlyCounts.set(key, (monthlyCounts.get(key) ?? 0) + 1);
-
-          const values = roundScores.map((r) => r.value);
-          const best = game.winner_rule === "min" ? Math.min(...values) : Math.max(...values);
-          if (me.value === best) wins += 1;
-          else losses += 1;
-
-          for (const other of roundScores) {
-            if (other.user_id === selected.id) continue;
-            const duel = rivalDuelMap.get(other.user_id) ?? { wins: 0, total: 0 };
-            duel.total += 1;
-            if (winnerBetween(me.value, other.value, game.winner_rule)) duel.wins += 1;
-            rivalDuelMap.set(other.user_id, duel);
-          }
-        }
-
-        if (wins + losses > 0) {
-          gameBreakdown.push({
-            name: game.name,
-            icon: game.icon,
-            wins,
-            losses,
-            games: wins + losses,
-          });
-        }
-      }
-
-      gameBreakdown.sort((a, b) => b.games - a.games || b.wins - a.wins);
-      const bestGame =
-        gameBreakdown.length > 0
-          ? [...gameBreakdown].sort(
-              (a, b) => b.wins / b.games - a.wins / a.games || b.games - a.games,
-            )[0]
-          : null;
-
-      const activityMonths =
-        selectedYearValue !== null
-          ? Array.from({ length: 12 }, (_, month) => ({
-              key: `${selectedYearValue}-${month}`,
-              label: monthLabelFromIndex(month),
-            }))
-          : Array.from({ length: 12 }, (_, i) => {
-              const now = new Date();
-              const d = new Date(now.getFullYear(), now.getMonth() - (11 - i), 1);
-              return {
-                key: `${d.getFullYear()}-${d.getMonth()}`,
-                label: monthLabel(d),
-              };
-            });
-
-      const activityLabels = activityMonths.map((m) => m.label);
-      const activityData = activityMonths.map((m) => monthlyCounts.get(m.key) ?? 0);
-
-      const rivals = Array.from(rivalDuelMap.entries())
-        .map(([userId, duel]) => {
-          const rivalName = players?.find((p) => p.id === userId)?.username ?? "Ismeretlen";
-          const pct = duel.total > 0 ? Math.round((duel.wins / duel.total) * 100) : 0;
-          return {
-            name: rivalName,
-            pct,
-            total: duel.total,
-            color: rivalColor(pct),
-          };
-        })
-        .filter((r) => r.total > 0)
-        .sort((a, b) => b.total - a.total || b.pct - a.pct)
-        .slice(0, 3)
-        .map(({ name, pct, color }) => ({ name, pct, color }));
-
-      return {
-        gameBreakdown,
-        activityData,
-        activityLabels,
-        rivals,
-        bestGameName: bestGame?.name ?? "N/A",
-      };
-    },
+  const { data: placements } = useSWR<ApiPlacement[]>(
+    "/api/stats/history",
+    (url: string) => fetchJson<ApiPlacement[]>(url),
   );
+
+  const derivedData = useMemo<PlayerDerivedData | undefined>(() => {
+    if (!selected || !games || !placements) return undefined;
+
+    const gameMap = new Map(games.map((g) => [g.id, g]));
+
+    const filteredPlacements =
+      selectedYearValue === null
+        ? placements
+        : placements.filter((row) => new Date(row.closed_at).getFullYear() === selectedYearValue);
+
+    // Build snapshot metadata (player count, worst place per snapshot)
+    const snapshotMeta = new Map<string, { playerCount: number; worstPlace: number }>();
+    for (const row of filteredPlacements) {
+      const current = snapshotMeta.get(row.snapshot_id) ?? { playerCount: 0, worstPlace: 0 };
+      current.playerCount += 1;
+      current.worstPlace = Math.max(current.worstPlace, row.place);
+      snapshotMeta.set(row.snapshot_id, current);
+    }
+
+    // Game breakdown: group by game_id, count wins/losses
+    const gameStats = new Map<string, { wins: number; losses: number; games: number }>();
+    const monthlyCounts = new Map<string, number>();
+    const rivalWinMap = new Map<string, { wins: number; total: number }>();
+
+    // Group placements by snapshot to compute rivals
+    const snapshotPlacements = new Map<string, ApiPlacement[]>();
+    for (const row of filteredPlacements) {
+      const list = snapshotPlacements.get(row.snapshot_id) ?? [];
+      list.push(row);
+      snapshotPlacements.set(row.snapshot_id, list);
+    }
+
+    for (const row of filteredPlacements) {
+      if (row.user_id !== selected.id) continue;
+
+      // Activity tracking
+      const closedAt = new Date(row.closed_at);
+      const key = `${closedAt.getFullYear()}-${closedAt.getMonth()}`;
+      monthlyCounts.set(key, (monthlyCounts.get(key) ?? 0) + 1);
+
+      // Game breakdown
+      const stats = gameStats.get(row.game_id) ?? { wins: 0, losses: 0, games: 0 };
+      stats.games += 1;
+      if (row.place === 1) {
+        stats.wins += 1;
+      } else {
+        const meta = snapshotMeta.get(row.snapshot_id);
+        if (meta && meta.playerCount > 1 && meta.worstPlace > 1 && row.place === meta.worstPlace) {
+          stats.losses += 1;
+        }
+      }
+      gameStats.set(row.game_id, stats);
+
+      // Rivals: compare with other players in the same snapshot
+      const snapshotPlayers = snapshotPlacements.get(row.snapshot_id) ?? [];
+      for (const other of snapshotPlayers) {
+        if (other.user_id === selected.id) continue;
+        const duel = rivalWinMap.get(other.user_id) ?? { wins: 0, total: 0 };
+        duel.total += 1;
+        if (row.place < other.place) duel.wins += 1;
+        rivalWinMap.set(other.user_id, duel);
+      }
+    }
+
+    const gameBreakdown: GameBreakdownRow[] = [];
+    for (const [gameId, stats] of gameStats) {
+      const game = gameMap.get(gameId);
+      if (!game || stats.games === 0) continue;
+      gameBreakdown.push({
+        name: game.name,
+        icon: game.icon,
+        wins: stats.wins,
+        losses: stats.losses,
+        games: stats.games,
+      });
+    }
+    gameBreakdown.sort((a, b) => b.games - a.games || b.wins - a.wins);
+
+    const bestGame =
+      gameBreakdown.length > 0
+        ? [...gameBreakdown].sort(
+            (a, b) => b.wins / b.games - a.wins / a.games || b.games - a.games,
+          )[0]
+        : null;
+
+    const activityMonths =
+      selectedYearValue !== null
+        ? Array.from({ length: 12 }, (_, month) => ({
+            key: `${selectedYearValue}-${month}`,
+            label: monthLabelFromIndex(month),
+          }))
+        : Array.from({ length: 12 }, (_, i) => {
+            const now = new Date();
+            const d = new Date(now.getFullYear(), now.getMonth() - (11 - i), 1);
+            return {
+              key: `${d.getFullYear()}-${d.getMonth()}`,
+              label: monthLabel(d),
+            };
+          });
+
+    const activityLabels = activityMonths.map((m) => m.label);
+    const activityData = activityMonths.map((m) => monthlyCounts.get(m.key) ?? 0);
+
+    const rivals = Array.from(rivalWinMap.entries())
+      .map(([userId, duel]) => {
+        const rivalName = players?.find((p) => p.id === userId)?.username ?? "Ismeretlen";
+        const pct = duel.total > 0 ? Math.round((duel.wins / duel.total) * 100) : 0;
+        return {
+          name: rivalName,
+          pct,
+          total: duel.total,
+          color: rivalColor(pct),
+        };
+      })
+      .filter((r) => r.total > 0)
+      .sort((a, b) => b.total - a.total || b.pct - a.pct)
+      .slice(0, 3)
+      .map(({ name, pct, color }) => ({ name, pct, color }));
+
+    return {
+      gameBreakdown,
+      activityData,
+      activityLabels,
+      rivals,
+      bestGameName: bestGame?.name ?? "N/A",
+    };
+  }, [selected, games, placements, players, selectedYearValue]);
 
   const pct = selected?.win_rate ?? 0;
   const totalGames = selected?.total_rounds ?? 0;

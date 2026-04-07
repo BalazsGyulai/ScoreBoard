@@ -11,6 +11,11 @@ interface ApiPlayerStat {
   total_rounds: number;
 }
 
+interface ApiPlacement {
+  snapshot_id: string;
+  closed_at: string;
+}
+
 function formatLastPlayed(date: Date | null) {
   if (!date) return "nincs adat";
   const now = new Date();
@@ -45,10 +50,10 @@ export async function GET() {
     const currentUserId =
       claims && typeof claims.sub === "string" ? claims.sub : null;
 
-    const [games, players, stats] = await Promise.all([
+    const [games, players, placements] = await Promise.all([
       serverFetch<ApiGame[]>("/games"),
       serverFetch<ApiPlayer[]>("/players"),
-      serverFetch<ApiPlayerStat[]>("/stats"),
+      serverFetch<ApiPlacement[]>("/stats/history"),
     ]);
 
     const finishedGames = games.filter((game) => game.status === "closed");
@@ -64,10 +69,7 @@ export async function GET() {
       players.find((player) => player.id === currentUserId)?.username ??
       "Jatekos";
 
-    const totalMatches = stats.reduce(
-      (maxRounds, row) => Math.max(maxRounds, row.total_rounds),
-      0,
-    );
+    const totalMatches = new Set(placements.map((p) => p.snapshot_id)).size;
 
     return NextResponse.json({
       username: currentUser,

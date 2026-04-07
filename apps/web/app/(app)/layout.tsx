@@ -1,4 +1,7 @@
+"use client";
+
 import Navigation from "@/components/nav/navigation";
+import { ToastProvider } from "@/components/toast/toastProvider";
 import styles from "./layout.module.css"
 
 export default function AppLayout({
@@ -8,12 +11,13 @@ export default function AppLayout({
 }) {
   return (
     <div className={`${styles.dottedBackround}`}>
+      <ToastProvider>
+        <Navigation />
 
-      <Navigation />
-
-      <main className={styles.page}>
-        {children}
-      </main>
+        <main className={styles.page}>
+          {children}
+        </main>
+      </ToastProvider>
     </div>
   );
 }

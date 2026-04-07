@@ -262,3 +262,47 @@ tr:hover .del-btn {
 .tbl-foot-info strong {
   color: var(--slate-900);
 }
+
+.confirm-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100dvh;
+  background: rgba(15, 23, 42, 0.4);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  z-index: 9999;
+  overflow: auto;
+}
+
+.confirm-modal {
+  width: min(100%, 440px);
+  border-radius: 14px;
+  border: 1px solid var(--slate-200);
+  background: var(--card);
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.2);
+  padding: 18px;
+}
+
+.confirm-modal h3 {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-family: "Bricolage Grotesque", sans-serif;
+  color: var(--slate-900);
+}
+
+.confirm-modal p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--slate-600);
+  line-height: 1.5;
+}
+
+.confirm-actions {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}

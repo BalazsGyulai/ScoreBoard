@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { createPortal } from "react-dom";
 import {
   ChevronLeft,
   ChevronRight,
@@ -11,6 +12,7 @@ import {
 } from "lucide-react";
 import ActionButton from "@/components/ui/actionButton";
 import Input from "@/components/ui/input";
+import { useToast } from "@/components/toast/toastProvider";
 import styles from "./game.module.css";
 import { useParams } from "next/navigation";
 import useSWR, { mutate } from "swr";
@@ -27,6 +29,7 @@ import type {
 } from "@/types/api";
 
 type MeResponse = { role: string };
+type PendingAction = "close" | "restart" | null;
 
 function slugify(name: string) {
   return name.trim().toLowerCase();
@@ -63,12 +66,16 @@ function buildScoreMap(scores: ApiScoreRow[]) {
 }
 
 export default function ActiveGamePage() {
+  const { showToast } = useToast();
   const params = useParams<{ gameName: string }>();
   const slug = decodeURIComponent(params.gameName ?? "");
   const [editingCell, setEditingCell] = useState<{ round: number; userId: string } | null>(null);
   const editRef = useRef<HTMLInputElement>(null);
   const [hiddenPlayerIds, setHiddenPlayerIds] = useState<Set<string>>(new Set());
   const [snapshotIndex, setSnapshotIndex] = useState(0);
+  const [pendingAction, setPendingAction] = useState<PendingAction>(null);
+  const [isSubmittingAction, setIsSubmittingAction] = useState(false);
+  const [isClient, setIsClient] = useState(false);
 
   // Use the cached games list to resolve slug -> game id.
   const { data: games } = useSWR<ApiGame[]>("/api/games", fetchJson, {
@@ -145,6 +152,10 @@ export default function ActiveGamePage() {
   }, []);
 
   useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  useEffect(() => {
     if (game?.status !== "closed") {
       setSnapshotIndex(0);
       return;
@@ -175,14 +186,17 @@ export default function ActiveGamePage() {
     rounds.reduce((s, r) => s + (r[pi] ?? 0), 0),
   );
 
-  const nonZeroTotals = totals
-    .map((t, idx) => ({ t, idx }))
-    .filter((x) => x.t > 0);
+  const hasScores = roundNumbers.length > 0;
+
+  const scoredTotals = totals
+    .map((t, idx) => ({ t, idx }));
+
+  const hasVisibleScoredPlayers = scoredTotals.length > 0;
 
   const leaderIdx =
-    !game || nonZeroTotals.length === 0
+    !game || !hasScores || !hasVisibleScoredPlayers
       ? null
-      : nonZeroTotals.reduce((a, b) => {
+      : scoredTotals.reduce((a, b) => {
         if (game.winner_rule === "min") return a.t <= b.t ? a : b;
         return a.t >= b.t ? a : b;
       }).idx;
@@ -191,13 +205,17 @@ export default function ActiveGamePage() {
   const leaderTotal = leaderIdx === null ? null : totals[leaderIdx] ?? null;
 
   const bestTotal =
-    !game || nonZeroTotals.length === 0
+    !game || !hasScores || !hasVisibleScoredPlayers
       ? null
       : (game.winner_rule === "min"
-        ? Math.min(...nonZeroTotals.map((x) => x.t))
-        : Math.max(...nonZeroTotals.map((x) => x.t)));
+        ? Math.min(...scoredTotals.map((x) => x.t))
+        : Math.max(...scoredTotals.map((x) => x.t)));
   const worstTotal =
-    nonZeroTotals.length === 0 ? null : Math.max(...nonZeroTotals.map((x) => x.t));
+    !game || !hasScores || !hasVisibleScoredPlayers
+      ? null
+      : (game.winner_rule === "min"
+        ? Math.max(...scoredTotals.map((x) => x.t))
+        : Math.min(...scoredTotals.map((x) => x.t)));
   const canManageGame = me?.role === "leader";
 
   async function commitRound() {
@@ -217,7 +235,7 @@ export default function ActiveGamePage() {
     }
 
     if (scores.length === 0) {
-      alert("Adj meg legalább egy pontszámot!");
+      showToast("Adj meg legalább egy pontszámot!");
       return;
     }
 
@@ -236,7 +254,7 @@ export default function ActiveGamePage() {
       } catch {
         // ignore parse errors
       }
-      alert(message);
+      showToast(message);
       return;
     }
 
@@ -287,7 +305,7 @@ export default function ActiveGamePage() {
       } catch {
         // ignore parse errors
       }
-      alert(message);
+      showToast(message);
       setEditingCell(null);
       return;
     }
@@ -308,7 +326,7 @@ export default function ActiveGamePage() {
   async function finishGame() {
     if (!game) return;
     if (!canManageGame) return;
-    if (!confirm("Biztosan le akarod zárni a meccset?")) return;
+    setIsSubmittingAction(true);
 
     const res = await fetch(`/api/games/${game.id}/close`, {
       method: "POST",
@@ -324,7 +342,8 @@ export default function ActiveGamePage() {
       } catch {
         // ignore parse errors
       }
-      alert(message);
+      showToast(message);
+      setIsSubmittingAction(false);
       return;
     }
 
@@ -334,12 +353,14 @@ export default function ActiveGamePage() {
     await mutate(`/api/games/${game.id}/scores`);
     await mutate("/api/stats");
     await Promise.all(dashboardCacheKeys.map((key) => mutate(key)));
+    setIsSubmittingAction(false);
+    setPendingAction(null);
   }
 
   async function restartGame() {
     if (!game) return;
     if (!canManageGame) return;
-    if (!confirm("Új játékot indítasz — a korábbi eredmények megmaradnak. Folytatod?")) return;
+    setIsSubmittingAction(true);
 
     const res = await fetch(`/api/games/${game.id}/restart`, {
       method: "POST",
@@ -355,7 +376,8 @@ export default function ActiveGamePage() {
       } catch {
         // ignore parse errors
       }
-      alert(message);
+      showToast(message);
+      setIsSubmittingAction(false);
       return;
     }
 
@@ -364,6 +386,18 @@ export default function ActiveGamePage() {
     await mutate(`/api/games/${game.id}/score-snapshots`);
     if (game) await mutate(`/api/games/${game.id}/scores`);
     await Promise.all(dashboardCacheKeys.map((key) => mutate(key)));
+    setIsSubmittingAction(false);
+    setPendingAction(null);
+  }
+
+  async function confirmPendingAction() {
+    if (pendingAction === "close") {
+      await finishGame();
+      return;
+    }
+    if (pendingAction === "restart") {
+      await restartGame();
+    }
   }
 
   return (
@@ -444,7 +478,7 @@ export default function ActiveGamePage() {
               text="Új játék"
               variant="ghost"
               icon={<PlusIcon size={13} />}
-              onClick={restartGame}
+              onClick={() => setPendingAction("restart")}
             />
           )}
           {canManageGame && game?.status !== "closed" && (
@@ -452,7 +486,7 @@ export default function ActiveGamePage() {
               text="Meccs lezárása"
               variant="amber"
               icon={<Check size={13} />}
-              onClick={finishGame}
+              onClick={() => setPendingAction("close")}
             />
           )}
         </div>
@@ -480,9 +514,9 @@ export default function ActiveGamePage() {
                 <td>Összesen</td>
                 {totals.map((t, i) => {
                   const isWinner =
-                    bestTotal !== null && t === bestTotal && t > 0;
+                    bestTotal !== null && t === bestTotal && bestTotal !== worstTotal;
                   const isLoser =
-                    worstTotal !== null && t === worstTotal && t > 0;
+                    worstTotal !== null && t === worstTotal && bestTotal !== worstTotal;
                   const cls = isWinner
                     ? styles["winner-col"]
                     : isLoser
@@ -598,6 +632,46 @@ export default function ActiveGamePage() {
           </div>
         </div>
       </div>
+
+      {isClient && pendingAction && createPortal((
+        <div
+          className={styles["confirm-overlay"]}
+          onClick={() => {
+            if (!isSubmittingAction) setPendingAction(null);
+          }}
+        >
+          <div
+            className={styles["confirm-modal"]}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="confirm-modal-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="confirm-modal-title">
+              {pendingAction === "close" ? "Meccs lezárása" : "Új játék indítása"}
+            </h3>
+            <p>
+              {pendingAction === "close"
+                ? "Biztosan le akarod zárni a meccset?"
+                : "Új játékot indítasz - a korábbi eredmények megmaradnak. Folytatod?"}
+            </p>
+            <div className={styles["confirm-actions"]}>
+              <ActionButton
+                text="Mégse"
+                variant="ghost"
+                onClick={() => setPendingAction(null)}
+                disabled={isSubmittingAction}
+              />
+              <ActionButton
+                text={pendingAction === "close" ? "Lezárás" : "Új játék"}
+                variant={pendingAction === "close" ? "amber" : "dark"}
+                onClick={() => void confirmPendingAction()}
+                disabled={isSubmittingAction}
+              />
+            </div>
+          </div>
+        </div>
+      ), document.body)}
     </div>
   );
 }
