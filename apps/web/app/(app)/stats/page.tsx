@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import styles from "./stats.module.css";
@@ -54,21 +55,88 @@ function avatarColor(seed: string) {
 }
 
 export default function StatsPage() {
+  const { data: availableYears } = useSWR<number[]>(
+    "/api/dashboard/stats-years",
+    fetchJson,
+  );
+  const [selectedYear, setSelectedYear] = useState<string>("overall");
+  const selectedYearValue = selectedYear === "overall" ? null : Number.parseInt(selectedYear, 10);
+  const selectedYearIndex = useMemo(() => {
+    if (!availableYears || selectedYearValue === null) return -1;
+    return availableYears.findIndex((year) => year === selectedYearValue);
+  }, [availableYears, selectedYearValue]);
+
   const { data: leaderboardRows } = useSWR<LeaderboardRow[]>(
-    "/api/dashboard/leaderboard",
+    `/api/dashboard/leaderboard?year=${selectedYear}`,
     fetchJson,
   );
   const { data: summaryRows } = useSWR<SummaryTableRow[]>(
-    "/api/dashboard/summary-table",
+    `/api/dashboard/summary-table?year=${selectedYear}`,
     fetchJson,
   );
   const sorted = leaderboardRows ?? [];
   const summary = summaryRows ?? [];
 
+  function prevYear() {
+    if (!availableYears || availableYears.length === 0) return;
+    if (selectedYear === "overall") {
+      setSelectedYear(String(availableYears[0]));
+      return;
+    }
+    if (selectedYearIndex < 0) return;
+    const target = availableYears[selectedYearIndex + 1];
+    if (target === undefined) {
+      setSelectedYear("overall");
+      return;
+    }
+    setSelectedYear(String(target));
+  }
+
+  function nextYear() {
+    if (!availableYears || availableYears.length === 0) return;
+    if (selectedYear === "overall") return;
+    if (selectedYearIndex <= 0) {
+      setSelectedYear(String(availableYears[0]));
+      return;
+    }
+    const target = availableYears[selectedYearIndex - 1];
+    if (target !== undefined) setSelectedYear(String(target));
+  }
+
   return (
     <div className="view">
       <div className={styles["page-top"]}>
-        <h1>Statisztika</h1>
+        <div className={styles["title-row"]}>
+          <h1>Statisztika</h1>
+          <div className={styles["year-controls"]}>
+            <button
+              className={styles["year-nav-btn"]}
+              onClick={prevYear}
+              type="button"
+            >
+              ← Előző
+            </button>
+            <select
+              className={styles["year-select"]}
+              value={selectedYear}
+              onChange={(event) => setSelectedYear(event.target.value)}
+            >
+              <option value="overall">Összes év</option>
+              {(availableYears ?? []).map((year) => (
+                <option key={year} value={String(year)}>
+                  {year}
+                </option>
+              ))}
+            </select>
+            <button
+              className={styles["year-nav-btn"]}
+              onClick={nextYear}
+              type="button"
+            >
+              Következő →
+            </button>
+          </div>
+        </div>
         <p>Csoport ranglista és összesített eredmények</p>
       </div>
 

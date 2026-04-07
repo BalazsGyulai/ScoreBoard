@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import useSWR from "swr";
 import StatisticCard from "@/components/ui/statisticCard";
@@ -74,6 +75,10 @@ function monthLabel(date: Date) {
   return date.toLocaleDateString("hu-HU", { month: "short" });
 }
 
+function monthLabelFromIndex(month: number) {
+  return new Date(2026, month, 1).toLocaleDateString("hu-HU", { month: "short" });
+}
+
 function rivalColor(pct: number) {
   if (pct >= 60) return "var(--success)";
   if (pct >= 40) return "var(--orange)";
@@ -88,10 +93,26 @@ export default function PlayerPage() {
   const params = useParams();
   const router = useRouter();
   const routeParam = String(params.id ?? "");
+  const { data: availableYears } = useSWR<number[]>(
+    "/api/dashboard/stats-years",
+    fetchJson,
+  );
+  const [selectedYear, setSelectedYear] = useState<string>("overall");
+  const selectedYearValue = selectedYear === "overall" ? null : Number.parseInt(selectedYear, 10);
+  const selectedYearIndex = useMemo(() => {
+    if (!availableYears || selectedYearValue === null) return -1;
+    return availableYears.findIndex((year) => year === selectedYearValue);
+  }, [availableYears, selectedYearValue]);
 
   const { data: players } = useSWR<ApiPlayer[]>("/api/players", fetchJson);
-  const { data: leaderboardRows } = useSWR<LeaderboardRow[]>("/api/dashboard/leaderboard", fetchJson);
-  const { data: summaryRows } = useSWR<SummaryTableRow[]>("/api/dashboard/summary-table", fetchJson);
+  const { data: leaderboardRows } = useSWR<LeaderboardRow[]>(
+    `/api/dashboard/leaderboard?year=${selectedYear}`,
+    fetchJson,
+  );
+  const { data: summaryRows } = useSWR<SummaryTableRow[]>(
+    `/api/dashboard/summary-table?year=${selectedYear}`,
+    fetchJson,
+  );
   const { data: games } = useSWR<ApiGame[]>("/api/games", fetchJson);
 
   const orderedRows = leaderboardRows ?? [];
@@ -107,7 +128,9 @@ export default function PlayerPage() {
   const selected = orderedRows[selectedIndex] ?? null;
 
   const { data: derivedData } = useSWR<PlayerDerivedData>(
-    selected && games ? ["player-derived", selected.id, games.map((g) => g.id).join(",")] : null,
+    selected && games
+      ? ["player-derived", selected.id, selectedYear, games.map((g) => g.id).join(",")]
+      : null,
     async () => {
       if (!selected || !games) {
         return {
@@ -135,11 +158,6 @@ export default function PlayerPage() {
         for (const s of scores) {
           if (!rounds.has(s.round)) rounds.set(s.round, []);
           rounds.get(s.round)!.push(s);
-          if (s.user_id === selected.id) {
-            const d = new Date(s.recorded_at);
-            const key = `${d.getFullYear()}-${d.getMonth()}`;
-            monthlyCounts.set(key, (monthlyCounts.get(key) ?? 0) + 1);
-          }
         }
 
         let wins = 0;
@@ -147,6 +165,12 @@ export default function PlayerPage() {
         for (const roundScores of rounds.values()) {
           const me = roundScores.find((r) => r.user_id === selected.id);
           if (!me) continue;
+          const playedAt = new Date(me.recorded_at);
+          if (selectedYearValue !== null && playedAt.getFullYear() !== selectedYearValue) {
+            continue;
+          }
+          const key = `${playedAt.getFullYear()}-${playedAt.getMonth()}`;
+          monthlyCounts.set(key, (monthlyCounts.get(key) ?? 0) + 1);
 
           const values = roundScores.map((r) => r.value);
           const best = game.winner_rule === "min" ? Math.min(...values) : Math.max(...values);
@@ -181,17 +205,23 @@ export default function PlayerPage() {
             )[0]
           : null;
 
-      const now = new Date();
-      const lastSixMonths = Array.from({ length: 6 }, (_, i) => {
-        const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
-        return {
-          key: `${d.getFullYear()}-${d.getMonth()}`,
-          label: monthLabel(d),
-        };
-      });
+      const activityMonths =
+        selectedYearValue !== null
+          ? Array.from({ length: 12 }, (_, month) => ({
+              key: `${selectedYearValue}-${month}`,
+              label: monthLabelFromIndex(month),
+            }))
+          : Array.from({ length: 12 }, (_, i) => {
+              const now = new Date();
+              const d = new Date(now.getFullYear(), now.getMonth() - (11 - i), 1);
+              return {
+                key: `${d.getFullYear()}-${d.getMonth()}`,
+                label: monthLabel(d),
+              };
+            });
 
-      const activityLabels = lastSixMonths.map((m) => m.label);
-      const activityData = lastSixMonths.map((m) => monthlyCounts.get(m.key) ?? 0);
+      const activityLabels = activityMonths.map((m) => m.label);
+      const activityData = activityMonths.map((m) => monthlyCounts.get(m.key) ?? 0);
 
       const rivals = Array.from(rivalDuelMap.entries())
         .map(([userId, duel]) => {
@@ -242,6 +272,32 @@ export default function PlayerPage() {
     router.push(`/players/${orderedRows[i].id}`);
   }
 
+  function prevYear() {
+    if (!availableYears || availableYears.length === 0) return;
+    if (selectedYear === "overall") {
+      setSelectedYear(String(availableYears[0]));
+      return;
+    }
+    if (selectedYearIndex < 0) return;
+    const target = availableYears[selectedYearIndex + 1];
+    if (target === undefined) {
+      setSelectedYear("overall");
+      return;
+    }
+    setSelectedYear(String(target));
+  }
+
+  function nextYear() {
+    if (!availableYears || availableYears.length === 0) return;
+    if (selectedYear === "overall") return;
+    if (selectedYearIndex <= 0) {
+      setSelectedYear(String(availableYears[0]));
+      return;
+    }
+    const target = availableYears[selectedYearIndex - 1];
+    if (target !== undefined) setSelectedYear(String(target));
+  }
+
   return (
     <div className="view">
       {/* ── Header ── */}
@@ -261,6 +317,20 @@ export default function PlayerPage() {
         </div>
         <div className={styles["player-nav"]}>
           <ActionButton text="← Előző" variant="ghost" onClick={prev} />
+          
+          <select
+            className={styles["year-select"]}
+            value={selectedYear}
+            onChange={(event) => setSelectedYear(event.target.value)}
+          >
+            <option value="overall">Összes év</option>
+            {(availableYears ?? []).map((year) => (
+              <option key={year} value={String(year)}>
+                {year}
+              </option>
+            ))}
+          </select>
+          
           <ActionButton text="Következő →" variant="ghost" onClick={next} />
         </div>
       </div>

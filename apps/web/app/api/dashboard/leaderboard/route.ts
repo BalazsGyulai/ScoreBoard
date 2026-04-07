@@ -9,21 +9,71 @@ interface ApiPlayerStat {
   total_rounds: number;
 }
 
-export async function GET() {
+interface ApiPlacement {
+  snapshot_id: string;
+  user_id: string;
+  place: number;
+  closed_at: string;
+}
+
+function parseYear(value: string | null) {
+  if (!value || value === "overall") return null;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+export async function GET(request: Request) {
   try {
-    const stats = await serverFetch<ApiPlayerStat[]>("/stats");
-    const rows = stats
+    const year = parseYear(new URL(request.url).searchParams.get("year"));
+    const [players, placements] = await Promise.all([
+      serverFetch<ApiPlayerStat[]>("/stats"),
+      serverFetch<ApiPlacement[]>("/stats/history"),
+    ]);
+
+    const filteredPlacements =
+      year === null
+        ? placements
+        : placements.filter((row) => new Date(row.closed_at).getFullYear() === year);
+
+    const snapshotMeta = new Map<string, { playerCount: number; worstPlace: number }>();
+    for (const row of filteredPlacements) {
+      const current = snapshotMeta.get(row.snapshot_id) ?? { playerCount: 0, worstPlace: 0 };
+      current.playerCount += 1;
+      current.worstPlace = Math.max(current.worstPlace, row.place);
+      snapshotMeta.set(row.snapshot_id, current);
+    }
+
+    const rows = players
       .map((row) => {
-        const winRate =
-          row.total_rounds > 0
-            ? Math.round((row.wins / row.total_rounds) * 100)
-            : 0;
+        let wins = 0;
+        let losses = 0;
+        let totalRounds = 0;
+
+        for (const placement of filteredPlacements) {
+          if (placement.user_id !== row.id) continue;
+          totalRounds += 1;
+          if (placement.place === 1) {
+            wins += 1;
+            continue;
+          }
+          const meta = snapshotMeta.get(placement.snapshot_id);
+          if (
+            meta &&
+            meta.playerCount > 1 &&
+            meta.worstPlace > 1 &&
+            placement.place === meta.worstPlace
+          ) {
+            losses += 1;
+          }
+        }
+
+        const winRate = totalRounds > 0 ? Math.round((wins / totalRounds) * 100) : 0;
         return {
           id: row.id,
           username: row.username,
-          wins: row.wins,
-          losses: row.losses,
-          total_rounds: row.total_rounds,
+          wins,
+          losses,
+          total_rounds: totalRounds,
           win_rate: winRate,
         };
       })

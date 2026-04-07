@@ -16,45 +16,82 @@ interface ApiPlacement {
   closed_at: string;
 }
 
-function currentWinningStreak(places: number[]) {
-  let streak = 0;
-  for (let i = places.length - 1; i >= 0; i -= 1) {
-    if (places[i] !== 1) break;
-    streak += 1;
-  }
-  return streak;
+function parseYear(value: string | null) {
+  if (!value || value === "overall") return null;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
-export async function GET() {
+function bestWinningStreak(places: number[]) {
+  let best = 0;
+  let streak = 0;
+  for (const place of places) {
+    if (place === 1) {
+      streak += 1;
+      best = Math.max(best, streak);
+    } else {
+      streak = 0;
+    }
+  }
+  return best;
+}
+
+export async function GET(request: Request) {
   try {
-    const [stats, placements] = await Promise.all([
+    const year = parseYear(new URL(request.url).searchParams.get("year"));
+    const [players, placements] = await Promise.all([
       serverFetch<ApiPlayerStat[]>("/stats"),
       serverFetch<ApiPlacement[]>("/stats/history"),
     ]);
 
+    const filteredPlacements =
+      year === null
+        ? placements
+        : placements.filter((row) => new Date(row.closed_at).getFullYear() === year);
+
+    const snapshotMeta = new Map<string, { playerCount: number; worstPlace: number }>();
+    for (const row of filteredPlacements) {
+      const current = snapshotMeta.get(row.snapshot_id) ?? { playerCount: 0, worstPlace: 0 };
+      current.playerCount += 1;
+      current.worstPlace = Math.max(current.worstPlace, row.place);
+      snapshotMeta.set(row.snapshot_id, current);
+    }
+
     const placesByUser = new Map<string, number[]>();
-    for (const row of placements) {
+    for (const row of filteredPlacements) {
       const list = placesByUser.get(row.user_id) ?? [];
       list.push(row.place);
       placesByUser.set(row.user_id, list);
     }
 
-    const rows = stats
+    const rows = players
       .map((row) => {
-        const winRate =
-          row.total_rounds > 0
-            ? Math.round((row.wins / row.total_rounds) * 100)
-            : 0;
         const placeHistory = placesByUser.get(row.id) ?? [];
+        const totalRounds = placeHistory.length;
+        const wins = placeHistory.filter((place) => place === 1).length;
+        const losses = filteredPlacements.reduce((acc, placement) => {
+          if (placement.user_id !== row.id) return acc;
+          const meta = snapshotMeta.get(placement.snapshot_id);
+          if (
+            meta &&
+            meta.playerCount > 1 &&
+            meta.worstPlace > 1 &&
+            placement.place === meta.worstPlace
+          ) {
+            return acc + 1;
+          }
+          return acc;
+        }, 0);
+        const winRate = totalRounds > 0 ? Math.round((wins / totalRounds) * 100) : 0;
         const trend = placeHistory.slice(-7);
         return {
           id: row.id,
           username: row.username,
-          wins: row.wins,
-          losses: row.losses,
-          total_rounds: row.total_rounds,
+          wins,
+          losses,
+          total_rounds: totalRounds,
           win_rate: winRate,
-          streak: currentWinningStreak(placeHistory),
+          streak: bestWinningStreak(placeHistory),
           trend,
         };
       })

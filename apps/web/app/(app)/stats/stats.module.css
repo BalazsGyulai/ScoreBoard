@@ -2,6 +2,45 @@
   margin-bottom: 26px;
 }
 
+.title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.year-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.year-select {
+  height: 34px;
+  border: 1px solid var(--slate-200);
+  background: var(--card);
+  border-radius: 8px;
+  padding: 0 10px;
+  font-size: 13px;
+  color: var(--slate-700);
+}
+
+.year-nav-btn {
+  border: 1px solid var(--slate-200);
+  background: var(--card);
+  color: var(--slate-700);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--t) var(--ease);
+}
+
+.year-nav-btn:hover {
+  background: var(--slate-100);
+}
+
 .page-top p {
   font-size: 14px;
   font-weight: 300;
