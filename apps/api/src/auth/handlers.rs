@@ -8,7 +8,7 @@ use uuid::Uuid;
 
 use super::models::{AuthResponse, LoginRequest, RegisterRequest, User};
 use super::tokens::{create_access_token, create_refresh_token};
-use crate::AppState;
+use crate::{auth::middleware::AuthUser, AppState};
 
 // builds a Set-Cookie header value with security flags
 fn make_cookie(name: &str, value: String, max_age_secs: i64) -> String {
@@ -193,4 +193,32 @@ pub async fn logout() -> Response {
         Json(serde_json::json!({ "message": "Logged out" })),
     )
         .into_response()
+}
+
+// GET /auth/me — returns the current authenticated user identity
+pub async fn me(auth: AuthUser, State(state): State<AppState>) -> Response {
+    let user = sqlx::query!(
+        r#"
+        SELECT username, role::TEXT as "role!"
+        FROM users
+        WHERE id = $1 AND group_id = $2
+        LIMIT 1
+        "#,
+        auth.user_id,
+        auth.group_id,
+    )
+    .fetch_optional(&state.db)
+    .await;
+
+    match user {
+        Ok(Some(u)) => Json(serde_json::json!({
+            "user_id": auth.user_id,
+            "group_id": auth.group_id,
+            "username": u.username,
+            "role": u.role,
+        }))
+        .into_response(),
+        Ok(None) => StatusCode::UNAUTHORIZED.into_response(),
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
 }

@@ -8,6 +8,8 @@ import type { ApiError, ApiPlayer } from "@/types/api";
 import { readHiddenPlayerIds, writeHiddenPlayerIds } from "@/lib/playerVisibility";
 import styles from "./sidebarSettings.module.css";
 
+type MeResponse = { role: string };
+
 export default function SidebarSettins({
     onClose = () => { },
 }: {
@@ -16,6 +18,12 @@ export default function SidebarSettins({
     const [visibility, setVisibility] = useState<Record<string, boolean>>({});
     const [isPending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
+    const { data: me } = useSWR<MeResponse>("/api/auth/me", fetchJson, {
+        revalidateOnFocus: false,
+        revalidateOnReconnect: false,
+        revalidateIfStale: false,
+    });
+    const canAddPlayer = me?.role === "leader";
     const {
         data: players,
         isLoading: playersLoading,
@@ -124,14 +132,16 @@ export default function SidebarSettins({
                 <div className={styles["s-section"]}>
                     <div className={styles["s-label"]}>
                         <span>Játékosok</span>
-                        <Link
-                            href="/players/new"
-                            className={styles["pt-eye"]}
-                            title="Új játékos"
-                            aria-label="Új játékos"
-                        >
-                            <Plus size={14} />
-                        </Link>
+                        {canAddPlayer && (
+                            <Link
+                                href="/players/new"
+                                className={styles["pt-eye"]}
+                                title="Új játékos"
+                                aria-label="Új játékos"
+                            >
+                                <Plus size={14} />
+                            </Link>
+                        )}
                     </div>
                     {playersLoading ? (
                         <div className={styles["pt-row"]}>

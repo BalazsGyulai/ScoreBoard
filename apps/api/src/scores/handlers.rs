@@ -9,6 +9,10 @@ use uuid::Uuid;
 use super::models::{AddRoundRequest, ScoreRow, UpdateScoreRequest};
 use crate::{auth::middleware::AuthUser, AppState};
 
+fn is_leader(role: &str) -> bool {
+    role == "leader"
+}
+
 // GET /games/:id/scores — all scores grouped by round
 pub async fn get_scores(
     auth: AuthUser,
@@ -53,6 +57,10 @@ pub async fn add_round(
     Path(game_id): Path<Uuid>,
     Json(body): Json<AddRoundRequest>,
 ) -> Response {
+    if !is_leader(&auth.role) {
+        return (StatusCode::FORBIDDEN, Json(serde_json::json!({ "error": "Only the leader can save rounds" }))).into_response();
+    }
+
     if body.scores.is_empty() {
         return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": "No scores provided" }))).into_response();
     }
@@ -121,6 +129,10 @@ pub async fn update_score(
     Path(score_id): Path<Uuid>,
     Json(body): Json<UpdateScoreRequest>,
 ) -> Response {
+    if !is_leader(&auth.role) {
+        return (StatusCode::FORBIDDEN, Json(serde_json::json!({ "error": "Only the leader can update scores" }))).into_response();
+    }
+
     // Ensure this score belongs to a game in the caller's group.
     // This prevents editing other groups' scores by guessing UUIDs.
     let result = sqlx::query!(

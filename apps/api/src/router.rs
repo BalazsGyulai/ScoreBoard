@@ -19,6 +19,7 @@ pub fn build(state: AppState) -> Router {
         .route("/auth/register", post(handlers::register))
         .route("/auth/login",    post(handlers::login))
         .route("/auth/logout",   post(handlers::logout))
+        .route("/auth/me",       get(handlers::me))
 
         // ── Players ───────────────────────────────────────────────────────────
         .route(

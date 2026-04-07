@@ -9,6 +9,10 @@ use uuid::Uuid;
 use super::models::{CloseGameResponse, CreateGameRequest, Game, GameResult};
 use crate::{auth::middleware::AuthUser, AppState};
 
+fn is_leader(role: &str) -> bool {
+    role == "leader"
+}
+
 // GET /games
 pub async fn list_games(auth: AuthUser, State(state): State<AppState>) -> Response {
     let result = sqlx::query_as!(
@@ -55,7 +59,7 @@ pub async fn create_game(
     State(state): State<AppState>,
     Json(body): Json<CreateGameRequest>,
 ) -> Response {
-    if auth.role != "leader" {
+    if !is_leader(&auth.role) {
         return (StatusCode::FORBIDDEN, Json(serde_json::json!({ "error": "Only the leader can create games" }))).into_response();
     }
     if body.name.trim().is_empty() {
@@ -125,6 +129,10 @@ pub async fn close_game(
     State(state): State<AppState>,
     Path(game_id): Path<Uuid>,
 ) -> Response {
+    if !is_leader(&auth.role) {
+        return (StatusCode::FORBIDDEN, Json(serde_json::json!({ "error": "Only the leader can close games" }))).into_response();
+    }
+
     // Fetch game, verify ownership and that it's still open
     let game = sqlx::query!(
         r#"SELECT id, winner_rule, status::TEXT AS "status!" FROM games WHERE id = $1 AND group_id = $2"#,
@@ -241,6 +249,10 @@ pub async fn restart_game(
     State(state): State<AppState>,
     Path(game_id): Path<Uuid>,
 ) -> Response {
+    if !is_leader(&auth.role) {
+        return (StatusCode::FORBIDDEN, Json(serde_json::json!({ "error": "Only the leader can restart games" }))).into_response();
+    }
+
     let game = sqlx::query!(
         r#"SELECT id, status::TEXT AS "status!" FROM games WHERE id = $1 AND group_id = $2"#,
         game_id,

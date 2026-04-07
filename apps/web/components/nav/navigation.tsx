@@ -8,10 +8,31 @@ import NavItem from "./navItem";
 import SidebarSettins from "./sidebarSettings";
 import { useState } from "react";
 import { usePathname } from "next/navigation";
+import useSWR from "swr";
+
+type MeResponse = { role: string };
+
+async function fetchJson<T>(url: string): Promise<T> {
+  const res = await fetch(url, {
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    throw new Error(`Hiba (${res.status})`);
+  }
+  return res.json() as Promise<T>;
+}
 
 export default function Navigation() {
   const [isSettingsOpen, setSettingsOpen] = useState(false);
   const pathname = usePathname();
+  const { data: me } = useSWR<MeResponse>("/api/auth/me", fetchJson, {
+    revalidateOnFocus: false,
+    revalidateOnReconnect: false,
+    revalidateIfStale: false,
+  });
+  const canManageGames = me?.role === "leader";
 
   const activePage = pathname.startsWith("/games")
     ? "games"
@@ -52,9 +73,11 @@ export default function Navigation() {
 
           <div className={styles["nav-sep"]} />
 
-          <Link href="/games/new" className={styles["nav-btn-add"]} title="Új játék">
-            <Plus size={15} />
-          </Link>
+          {canManageGames && (
+            <Link href="/games/new" className={styles["nav-btn-add"]} title="Új játék">
+              <Plus size={15} />
+            </Link>
+          )}
         </div>
       </nav>
 

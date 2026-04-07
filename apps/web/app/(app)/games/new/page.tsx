@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Dices, Star } from "lucide-react";
-import { mutate } from "swr";
+import useSWR, { mutate } from "swr";
 import Card from "@/components/ui/card";
 import Input from "@/components/ui/input";
 import Dropdown from "@/components/ui/dropdown";
@@ -28,6 +28,20 @@ const winnerRuleOptions = [
     },
 ];
 
+type MeResponse = { role: string };
+
+async function fetchJson<T>(url: string): Promise<T> {
+    const res = await fetch(url, {
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        cache: "no-store",
+    });
+    if (!res.ok) {
+        throw new Error(`Hiba (${res.status})`);
+    }
+    return res.json() as Promise<T>;
+}
+
 export default function NewGamePage() {
     const [isPending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
@@ -36,6 +50,12 @@ export default function NewGamePage() {
     const [iconEmoji, setIconEmoji] = useState("");
     const [iconName, setIconName] = useState("");
     const [pickerOpen, setPickerOpen] = useState(false);
+    const { data: me, isLoading: meLoading } = useSWR<MeResponse>("/api/auth/me", fetchJson, {
+        revalidateOnFocus: false,
+        revalidateOnReconnect: false,
+        revalidateIfStale: false,
+    });
+    const canCreate = me?.role === "leader";
 
     const handleCreate = () => {
         setError(null);
@@ -96,6 +116,12 @@ export default function NewGamePage() {
             <div className="view">
                 <div className={styles.center}>
                     <Card heading="Új játék" subHeading="Hozz létre egy játékot.">
+                        {meLoading ? (
+                            <p>Betöltés...</p>
+                        ) : !canCreate ? (
+                            <p className={styles.error}>Csak a leader hozhat létre új játékot.</p>
+                        ) : (
+                            <>
                         <div className={styles.fields}>
                             <Input
                                 id="gameName"
@@ -139,6 +165,8 @@ export default function NewGamePage() {
                         <div className={styles.actions}>
                             <Button text="Játék létrehozása" onClick={handleCreate} disabled={isPending} />
                         </div>
+                            </>
+                        )}
                     </Card>
                 </div>
 

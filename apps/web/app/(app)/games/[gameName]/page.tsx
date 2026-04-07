@@ -3,8 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  Settings,
-  Trash2,
   Check,
   Plus,
   PlusIcon,
@@ -24,6 +22,8 @@ import type {
   ApiScoreRow,
   UpdateScoreRequest,
 } from "@/types/api";
+
+type MeResponse = { role: string };
 
 function slugify(name: string) {
   return name.trim().toLowerCase();
@@ -74,6 +74,13 @@ export default function ActiveGamePage() {
   });
   const game = games?.find((g) => slugify(g.name) === slugify(slug));
 
+  const {
+    data: me,
+  } = useSWR<MeResponse>("/api/auth/me", fetchJson, {
+    revalidateOnFocus: false,
+    revalidateOnReconnect: false,
+    revalidateIfStale: false,
+  });
   const {
     data: players,
     isLoading: playersLoading,
@@ -154,9 +161,11 @@ export default function ActiveGamePage() {
         : Math.max(...nonZeroTotals.map((x) => x.t)));
   const worstTotal =
     nonZeroTotals.length === 0 ? null : Math.max(...nonZeroTotals.map((x) => x.t));
+  const canManageGame = me?.role === "leader";
 
   async function commitRound() {
     if (!game) return;
+    if (!canManageGame) return;
     if (!orderedPlayers.length) return;
 
     const scores: AddRoundRequest["scores"] = [];
@@ -206,12 +215,14 @@ export default function ActiveGamePage() {
   }
 
   function startEdit(round: number, userId: string) {
+    if (!canManageGame) return;
     if (game?.status === "closed") return;
     setEditingCell({ round, userId });
     setTimeout(() => editRef.current?.select(), 0);
   }
 
   async function saveEdit(scoreId: string, prevValue: number) {
+    if (!canManageGame) return;
     const raw = editRef.current?.value ?? "";
     const nextValue = parseInt(raw, 10);
     if (Number.isNaN(nextValue)) {
@@ -259,6 +270,7 @@ export default function ActiveGamePage() {
 
   async function finishGame() {
     if (!game) return;
+    if (!canManageGame) return;
     if (!confirm("Biztosan le akarod zárni a meccset?")) return;
 
     const res = await fetch(`/api/games/${game.id}/close`, {
@@ -288,6 +300,7 @@ export default function ActiveGamePage() {
 
   async function restartGame() {
     if (!game) return;
+    if (!canManageGame) return;
     if (!confirm("Új játékot indítasz — a korábbi eredmények megmaradnak. Folytatod?")) return;
 
     const res = await fetch(`/api/games/${game.id}/restart`, {
@@ -364,7 +377,7 @@ export default function ActiveGamePage() {
             icon={<Trash2 size={13} />}
           /> */}
 
-          {game?.status === "closed" && (
+          {canManageGame && game?.status === "closed" && (
             <ActionButton
               text="Új játék"
               variant="ghost"
@@ -372,7 +385,7 @@ export default function ActiveGamePage() {
               onClick={restartGame}
             />
           )}
-          {game?.status !== "closed" && (
+          {canManageGame && game?.status !== "closed" && (
             <ActionButton
               text="Meccs lezárása"
               variant="amber"
@@ -424,7 +437,7 @@ export default function ActiveGamePage() {
               </tr>
 
               {/* Input row — only for open games */}
-              {game?.status !== "closed" && (
+              {canManageGame && game?.status !== "closed" && (
                 <tr className={styles["input-row"]}>
                   <td>Új kör</td>
                   {orderedPlayers.map((p) => (
@@ -473,7 +486,7 @@ export default function ActiveGamePage() {
                               }}
                               autoFocus
                             />
-                          ) : (
+                          ) : canManageGame && game?.status !== "closed" ? (
                             <span
                               className={styles["cell-val"]}
                               onClick={() => startEdit(roundNo, p.id)}
@@ -481,6 +494,8 @@ export default function ActiveGamePage() {
                             >
                               {score.value}
                             </span>
+                          ) : (
+                            <span className={styles["cell-val"]}>{score.value}</span>
                           )
                         ) : val === null ? (
                           <span style={{ color: "var(--slate-200)" }}>—</span>
@@ -502,7 +517,7 @@ export default function ActiveGamePage() {
               <strong>{rounds.length}</strong> kör lejátszva
             </span>
             <div style={{ display: "flex", gap: 8 }}>
-              {game?.status !== "closed" && (
+              {canManageGame && game?.status !== "closed" && (
                 <>
                   <ActionButton
                     text="Mégse"
