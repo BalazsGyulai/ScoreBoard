@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
+  ChevronLeft,
+  ChevronRight,
   Check,
   Plus,
   PlusIcon,
@@ -20,6 +22,7 @@ import type {
   ApiGame,
   ApiPlayer,
   ApiScoreRow,
+  ApiScoreSnapshot,
   UpdateScoreRequest,
 } from "@/types/api";
 
@@ -65,6 +68,7 @@ export default function ActiveGamePage() {
   const [editingCell, setEditingCell] = useState<{ round: number; userId: string } | null>(null);
   const editRef = useRef<HTMLInputElement>(null);
   const [hiddenPlayerIds, setHiddenPlayerIds] = useState<Set<string>>(new Set());
+  const [snapshotIndex, setSnapshotIndex] = useState(0);
 
   // Use the cached games list to resolve slug -> game id.
   const { data: games } = useSWR<ApiGame[]>("/api/games", fetchJson, {
@@ -92,11 +96,32 @@ export default function ActiveGamePage() {
   });
 
   const {
+    data: scoreSnapshots,
+  } = useSWR<ApiScoreSnapshot[]>(
+    game?.status === "closed" ? `/api/games/${game.id}/score-snapshots` : null,
+    fetchJson,
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      revalidateIfStale: false,
+    },
+  );
+
+  const selectedSnapshotId =
+    game?.status === "closed" && scoreSnapshots && scoreSnapshots.length > 0
+      ? scoreSnapshots[Math.min(snapshotIndex, scoreSnapshots.length - 1)]?.snapshot_id ?? null
+      : null;
+
+  const {
     data: scoreRows,
     isLoading: scoresLoading,
     error: scoresError,
   } = useSWR<ApiScoreRow[]>(
-    game ? `/api/games/${game.id}/scores` : null,
+    game
+      ? game.status === "closed" && selectedSnapshotId
+        ? `/api/games/${game.id}/scores?snapshot_id=${encodeURIComponent(selectedSnapshotId)}`
+        : `/api/games/${game.id}/scores`
+      : null,
     fetchJson,
     {
       revalidateOnFocus: false,
@@ -118,6 +143,18 @@ export default function ActiveGamePage() {
       window.removeEventListener("focus", syncHiddenPlayers);
     };
   }, []);
+
+  useEffect(() => {
+    if (game?.status !== "closed") {
+      setSnapshotIndex(0);
+      return;
+    }
+    if (!scoreSnapshots || scoreSnapshots.length === 0) {
+      setSnapshotIndex(0);
+      return;
+    }
+    setSnapshotIndex((prev) => Math.min(prev, scoreSnapshots.length - 1));
+  }, [game?.id, game?.status, scoreSnapshots]);
 
   const orderedPlayers = (players ?? [])
     .filter((player) => isPlayerVisible(player.id, hiddenPlayerIds))
@@ -293,6 +330,7 @@ export default function ActiveGamePage() {
 
     // Refresh game data (status will now be 'closed') and related caches
     await mutate("/api/games");
+    await mutate(`/api/games/${game.id}/score-snapshots`);
     await mutate(`/api/games/${game.id}/scores`);
     await mutate("/api/stats");
     await Promise.all(dashboardCacheKeys.map((key) => mutate(key)));
@@ -323,6 +361,7 @@ export default function ActiveGamePage() {
 
     // Refresh everything — game is open again with no scores
     await mutate("/api/games");
+    await mutate(`/api/games/${game.id}/score-snapshots`);
     if (game) await mutate(`/api/games/${game.id}/scores`);
     await Promise.all(dashboardCacheKeys.map((key) => mutate(key)));
   }
@@ -357,6 +396,11 @@ export default function ActiveGamePage() {
             ) : (
               <>
                 {orderedPlayers.length} játékos · {game?.status === "closed" ? "Lezárva" : "Folyamatban"} &nbsp;·&nbsp;{" "}
+                {game?.status === "closed" && scoreSnapshots && scoreSnapshots.length > 0 && (
+                  <>
+                    Archívum: {snapshotIndex + 1}/{scoreSnapshots.length} &nbsp;·&nbsp;{" "}
+                  </>
+                )}
                 {leaderName && leaderTotal !== null ? (
                   <span className={styles.orange} style={{ fontWeight: 500 }}>
                     🏆 Vezet: {leaderName} ({leaderTotal} pont)
@@ -377,6 +421,24 @@ export default function ActiveGamePage() {
             icon={<Trash2 size={13} />}
           /> */}
 
+          {canManageGame && game?.status === "closed" && (
+            <>
+              <ActionButton
+                text="Előző"
+                variant="ghost"
+                icon={<ChevronLeft size={13} />}
+                onClick={() => setSnapshotIndex((prev) => prev + 1)}
+                disabled={!scoreSnapshots || snapshotIndex >= scoreSnapshots.length - 1}
+              />
+              <ActionButton
+                text="Következő"
+                variant="ghost"
+                icon={<ChevronRight size={13} />}
+                onClick={() => setSnapshotIndex((prev) => Math.max(0, prev - 1))}
+                disabled={!scoreSnapshots || snapshotIndex <= 0}
+              />
+            </>
+          )}
           {canManageGame && game?.status === "closed" && (
             <ActionButton
               text="Új játék"

@@ -14,6 +14,12 @@ pub struct ScoreRow {
     pub recorded_at: DateTime<Utc>,
 }
 
+#[derive(Debug, Clone, Serialize, FromRow)]
+pub struct ScoreSnapshotRow {
+    pub snapshot_id: Uuid,
+    pub archived_at: DateTime<Utc>,
+}
+
 // Request to submit all scores for the current round
 #[derive(Debug, Deserialize)]
 pub struct AddRoundRequest {
@@ -29,4 +35,9 @@ pub struct PlayerScore {
 #[derive(Debug, Deserialize)]
 pub struct UpdateScoreRequest {
     pub value: i32,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ScoreQuery {
+    pub snapshot_id: Option<Uuid>,
 }

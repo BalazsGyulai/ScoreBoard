@@ -134,6 +134,11 @@ export interface ApiScoreRow {
   recorded_at: string;
 }
 
+export interface ApiScoreSnapshot {
+  snapshot_id: string;
+  archived_at: string;
+}
+
 export interface AddScoreRequest {
   user_id: string;
   game_id: string;

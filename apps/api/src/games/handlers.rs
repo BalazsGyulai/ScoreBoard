@@ -199,7 +199,7 @@ pub async fn close_game(
         });
     }
 
-    // Transaction: insert results + mark game closed
+    // Transaction: archive scores, insert results, mark game closed
     let mut tx = match state.db.begin().await {
         Ok(tx) => tx,
         Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
@@ -207,6 +207,32 @@ pub async fn close_game(
 
     // One close operation = one immutable results snapshot.
     let snapshot_id = Uuid::new_v4();
+
+    // Move live score rows into archive snapshot before deleting from scores.
+    if sqlx::query(
+        r#"
+        INSERT INTO score_archives (snapshot_id, game_id, user_id, round, value, recorded_at)
+        SELECT $1, game_id, user_id, round, value, recorded_at
+        FROM scores
+        WHERE game_id = $2
+        "#,
+    )
+    .bind(snapshot_id)
+    .bind(game_id)
+    .execute(&mut *tx)
+    .await
+    .is_err()
+    {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    }
+
+    if sqlx::query!("DELETE FROM scores WHERE game_id = $1", game_id)
+        .execute(&mut *tx)
+        .await
+        .is_err()
+    {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    }
 
     for r in &results {
         let res = sqlx::query(
