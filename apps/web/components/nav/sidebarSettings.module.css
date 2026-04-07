@@ -121,6 +121,7 @@
 
 /* player toggle row */
 .pt-row {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 9px;
@@ -139,9 +140,12 @@
 }
 
 .pt-eye {
+    position: absolute;
+    right: 0;
     width: 28px;
     height: 28px;
     border-radius: 8px;
+    box-shadow: 0 0 0 3px var(--card), 0 0 0 7px #ffffffbe;
     border: none;
     cursor: pointer;
     display: flex;

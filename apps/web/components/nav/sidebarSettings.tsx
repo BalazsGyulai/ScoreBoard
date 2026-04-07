@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
+import useSWR from "swr";
 import { LogOut, X, Eye, Loader2 } from "lucide-react";
-import { players, avatarColors } from "@/lib/mockData";
+import type { ApiError, ApiPlayer } from "@/types/api";
+import { avatarColors } from "@/lib/mockData";
 import styles from "./sidebarSettings.module.css";
 
 export default function SidebarSettins({
@@ -10,18 +12,61 @@ export default function SidebarSettins({
 }: {
     onClose?: React.MouseEventHandler<HTMLElement>;
 }) {
-    const [visibility, setVisibility] = useState<boolean[]>(
-        players.map(() => true),
-    );
+    const [visibility, setVisibility] = useState<Record<string, boolean>>({});
     const [isPending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
+    const {
+        data: players,
+        isLoading: playersLoading,
+        error: playersError,
+    } = useSWR<ApiPlayer[]>("/api/players", fetchJson, {
+        revalidateOnFocus: false,
+        revalidateOnReconnect: false,
+        revalidateIfStale: false,
+    });
 
-    function togglePlayer(idx: number) {
+    useEffect(() => {
+        if (!players?.length) return;
         setVisibility((prev) => {
-            const next = [...prev];
-            next[idx] = !next[idx];
+            const next: Record<string, boolean> = {};
+            for (const p of players) {
+                next[p.id] = prev[p.id] ?? true;
+            }
             return next;
         });
+    }, [players]);
+
+    const orderedPlayers = (players ?? []).slice().sort((a, b) =>
+        a.username.localeCompare(b.username, "hu"),
+    );
+
+    function togglePlayer(userId: string) {
+        setVisibility((prev) => {
+            const next = { ...prev };
+            next[userId] = !next[userId];
+            return next;
+        });
+    }
+
+    async function fetchJson<T>(url: string): Promise<T> {
+        const res = await fetch(url, {
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            cache: "no-store",
+        });
+
+        if (!res.ok) {
+            let message = `Hiba (${res.status})`;
+            try {
+                const data = (await res.json()) as Partial<ApiError>;
+                message = data.error ?? message;
+            } catch {
+                // ignore parse errors
+            }
+            throw new Error(message);
+        }
+
+        return res.json() as Promise<T>;
     }
 
     const handleSignOut = () => {
@@ -70,7 +115,18 @@ export default function SidebarSettins({
                 {/* ── Players ── */}
                 <div className={styles["s-section"]}>
                     <div className={styles["s-label"]}>Játékosok</div>
-                    {players.map((p, i) => (
+                    {playersLoading ? (
+                        <div className={styles["pt-row"]}>
+                            <Loader2 size={14} className={styles.spinner} />
+                            <div className={styles["pt-name"]}>Játékosok betöltése...</div>
+                        </div>
+                    ) : playersError ? (
+                        <div className={styles["pt-row"]}>
+                            <div className={styles["pt-name"]}>
+                                {(playersError as Error).message || "Nem sikerült betölteni a játékosokat"}
+                            </div>
+                        </div>
+                    ) : orderedPlayers.map((p, i) => (
                         <div className={styles["pt-row"]} key={p.id}>
                             <div
                                 className={`${styles.avatar} ${styles.av36}`}
@@ -79,13 +135,13 @@ export default function SidebarSettins({
                                     color: "#fff",
                                 }}
                             >
-                                {p.name[0]}
+                                {p.username[0]?.toUpperCase() ?? "?"}
                             </div>
-                            <div className={styles["pt-name"]}>{p.name}</div>
+                            <div className={styles["pt-name"]}>{p.username}</div>
                             <button
-                                className={`${styles["pt-eye"]} ${visibility[i] ? styles.on : ""}`}
+                                className={`${styles["pt-eye"]} ${visibility[p.id] ? styles.on : ""}`}
                                 title="Megjelenítés"
-                                onClick={() => togglePlayer(i)}
+                                onClick={() => togglePlayer(p.id)}
                             >
                                 <Eye size={12} />
                             </button>
