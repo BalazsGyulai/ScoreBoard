@@ -1,11 +1,69 @@
+"use client";
+
 import Link from "next/link";
-import { players, avatarColors, streaks } from "@/lib/mockData";
+import useSWR from "swr";
 import styles from "./stats.module.css";
 
+type LeaderboardRow = {
+  id: string;
+  username: string;
+  wins: number;
+  losses: number;
+  total_rounds: number;
+  win_rate: number;
+};
+
+type SummaryTableRow = LeaderboardRow & {
+  streak: number;
+  trend: number[];
+};
+
+async function fetchJson<T>(url: string): Promise<T> {
+  const res = await fetch(url, {
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    let message = `Hiba (${res.status})`;
+    try {
+      const data = (await res.json()) as { error?: string };
+      message = data.error ?? message;
+    } catch {
+      // ignore parse errors
+    }
+    throw new Error(message);
+  }
+
+  return res.json() as Promise<T>;
+}
+
+function avatarColor(seed: string) {
+  const palette = [
+    "#0F172A",
+    "#F97316",
+    "#7C3AED",
+    "#0EA5E9",
+    "#16A34A",
+    "#EF4444",
+    "#334155",
+  ];
+  const hash = [...seed].reduce((acc, c) => acc + c.charCodeAt(0), 0);
+  return palette[hash % palette.length];
+}
+
 export default function StatsPage() {
-  const sorted = [...players].sort(
-    (a, b) => b.wins / b.games - a.wins / a.games,
+  const { data: leaderboardRows } = useSWR<LeaderboardRow[]>(
+    "/api/dashboard/leaderboard",
+    fetchJson,
   );
+  const { data: summaryRows } = useSWR<SummaryTableRow[]>(
+    "/api/dashboard/summary-table",
+    fetchJson,
+  );
+  const sorted = leaderboardRows ?? [];
+  const summary = summaryRows ?? [];
 
   return (
     <div className="view">
@@ -24,7 +82,7 @@ export default function StatsPage() {
             </span>
           </div>
           {sorted.map((p, i) => {
-            const pct = Math.round((p.wins / p.games) * 100);
+            const pct = p.win_rate;
             const rankClass =
               i === 0
                 ? styles.r1
@@ -33,10 +91,9 @@ export default function StatsPage() {
                   : i === 2
                     ? styles.r3
                     : "";
-            const origIdx = players.indexOf(p);
             return (
               <Link
-                href={`/players/${origIdx}`}
+                href={`/players/${i}`}
                 key={p.id}
                 className={styles["lb-row"]}
               >
@@ -46,14 +103,14 @@ export default function StatsPage() {
                 <div
                   className={`${styles.avatar} ${styles.av36}`}
                   style={{
-                    background: avatarColors[origIdx],
+                    background: avatarColor(p.id),
                     color: "#fff",
                   }}
                 >
-                  {p.name[0]}
+                  {p.username[0]}
                 </div>
-                <div className={styles["lb-name"]}>{p.name}</div>
-                <div className={styles["lb-games-ct"]}>{p.games} meccs</div>
+                <div className={styles["lb-name"]}>{p.username}</div>
+                <div className={styles["lb-games-ct"]}>{p.total_rounds} kör</div>
                 <div className={styles["lb-bar-w"]}>
                   <div className={styles["bar-track"]}>
                     <div
@@ -92,9 +149,8 @@ export default function StatsPage() {
                 </tr>
               </thead>
               <tbody>
-                {sorted.map((p, i) => {
-                  const pct = Math.round((p.wins / p.games) * 100);
-                  const origIdx = players.indexOf(p);
+                {summary.map((p, i) => {
+                  const pct = p.win_rate;
                   const barColor =
                     pct >= 60
                       ? "var(--success)"
@@ -105,7 +161,7 @@ export default function StatsPage() {
                     <tr key={p.id}>
                       <td>
                         <Link
-                          href={`/players/${origIdx}`}
+                          href={`/players/${i}`}
                           style={{
                             display: "flex",
                             alignItems: "center",
@@ -117,15 +173,15 @@ export default function StatsPage() {
                           <div
                             className={`${styles.avatar} ${styles.av36}`}
                             style={{
-                              background: avatarColors[origIdx],
+                              background: avatarColor(p.id),
                               color: "#fff",
                               fontSize: 12,
                             }}
                           >
-                            {p.name[0]}
+                            {p.username[0]}
                           </div>
                           <span style={{ fontWeight: 500, fontSize: 14 }}>
-                            {p.name}
+                            {p.username}
                           </span>
                         </Link>
                       </td>
@@ -141,7 +197,7 @@ export default function StatsPage() {
                           {p.losses}
                         </span>
                       </td>
-                      <td style={{ color: "var(--slate-500)" }}>{p.games}</td>
+                      <td style={{ color: "var(--slate-500)" }}>{p.total_rounds}</td>
                       <td>
                         <div
                           style={{
@@ -172,7 +228,7 @@ export default function StatsPage() {
                         </div>
                       </td>
                       <td style={{ fontWeight: 600 }}>
-                        {streaks[origIdx]} 🔥
+                        {p.streak} 🔥
                       </td>
                       <td>
                         <div
@@ -184,7 +240,7 @@ export default function StatsPage() {
                             justifyContent: "center",
                           }}
                         >
-                          {[3, 5, 8, 4, 7, 6, 5].map((h, bi) => (
+                          {p.trend.map((h, bi) => (
                             <div
                               key={bi}
                               style={{

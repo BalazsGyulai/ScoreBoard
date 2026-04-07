@@ -14,6 +14,7 @@ import Input from "@/components/ui/input";
 import styles from "./game.module.css";
 import { useParams } from "next/navigation";
 import useSWR, { mutate } from "swr";
+import { dashboardCacheKeys } from "@/lib/dashboard/cacheKeys";
 import type {
   AddRoundRequest,
   ApiError,
@@ -261,6 +262,7 @@ export default function ActiveGamePage() {
 
     // Refresh game data (status will now be 'closed')
     await mutate("/api/games");
+    await Promise.all(dashboardCacheKeys.map((key) => mutate(key)));
   }
 
   async function restartGame() {
@@ -288,6 +290,7 @@ export default function ActiveGamePage() {
     // Refresh everything — game is open again with no scores
     await mutate("/api/games");
     if (game) await mutate(`/api/games/${game.id}/scores`);
+    await Promise.all(dashboardCacheKeys.map((key) => mutate(key)));
   }
 
   return (
