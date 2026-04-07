@@ -25,11 +25,12 @@ struct LegacyGameSetting {
 
 #[derive(Debug, Clone)]
 struct LegacyScore {
+    legacy_row_id: i32,
     user_id: i32,
     value: i32,
-    round: i32,
+    legacy_match_id: i32,
     game_name: String,
-    calendar: String,
+    recorded_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone)]
@@ -46,6 +47,7 @@ struct ScoreWithUser {
     user_id: Uuid,
     value: i32,
     round: i32,
+    recorded_at: DateTime<Utc>,
 }
 
 #[tokio::main]
@@ -143,25 +145,34 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         rule_map.entry(key).or_insert_with(|| normalize_rule(&gs.winner_rule));
     }
 
-    // (group_token, game_name, calendar) -> rows
-    let mut grouped: BTreeMap<(String, String, String), Vec<ScoreWithUser>> = BTreeMap::new();
+    #[derive(Debug, Clone)]
+    struct RawScoreWithUser {
+        legacy_row_id: i32,
+        user_id: Uuid,
+        value: i32,
+        recorded_at: DateTime<Utc>,
+    }
+
+    // (group_token, game_name, legacy_match_id) -> rows
+    let mut grouped: BTreeMap<(String, String, i32), Vec<RawScoreWithUser>> = BTreeMap::new();
     for s in scores {
         let (new_user_id, user_group_token) = user_map
             .get(&s.user_id)
             .ok_or_else(|| format!("Score references unknown user id {}", s.user_id))?
             .clone();
         grouped
-            .entry((user_group_token, s.game_name, s.calendar))
+            .entry((user_group_token, s.game_name, s.legacy_match_id))
             .or_default()
-            .push(ScoreWithUser {
+            .push(RawScoreWithUser {
+                legacy_row_id: s.legacy_row_id,
                 user_id: new_user_id,
                 value: s.value,
-                round: s.round,
+                recorded_at: s.recorded_at,
             });
     }
 
     let mut matches: Vec<MatchGroup> = Vec::new();
-    for ((group_token, game_name, calendar), rows) in grouped {
+    for ((group_token, game_name, _legacy_match_id), mut rows) in grouped {
         let group_id = *group_map
             .get(&group_token)
             .ok_or_else(|| format!("Missing group mapping for token {}", group_token))?;
@@ -169,13 +180,39 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .get(&(group_token.clone(), game_name.clone()))
             .cloned()
             .unwrap_or_else(|| "min".to_string());
-        let closed_at = parse_legacy_calendar(&calendar)?;
+        rows.sort_by_key(|r| (r.recorded_at, r.legacy_row_id));
+
+        let mut round_by_time: BTreeMap<DateTime<Utc>, i32> = BTreeMap::new();
+        for row in &rows {
+            if !round_by_time.contains_key(&row.recorded_at) {
+                let next_round = (round_by_time.len() as i32) + 1;
+                round_by_time.insert(row.recorded_at, next_round);
+            }
+        }
+
+        let mapped_rows: Vec<ScoreWithUser> = rows
+            .into_iter()
+            .map(|row| ScoreWithUser {
+                user_id: row.user_id,
+                value: row.value,
+                round: *round_by_time
+                    .get(&row.recorded_at)
+                    .expect("round map should contain all recorded_at keys"),
+                recorded_at: row.recorded_at,
+            })
+            .collect();
+        let closed_at = mapped_rows
+            .iter()
+            .map(|r| r.recorded_at)
+            .max()
+            .ok_or("Match group unexpectedly had no rows")?;
+
         matches.push(MatchGroup {
             group_id,
             game_name,
             winner_rule,
             closed_at,
-            rows,
+            rows: mapped_rows,
         });
     }
     matches.sort_by_key(|m| m.closed_at);
@@ -239,7 +276,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .bind(row.user_id)
             .bind(row.round)
             .bind(row.value)
-            .bind(m.closed_at)
+            .bind(row.recorded_at)
             .execute(&mut *tx)
             .await?;
         }
@@ -273,13 +310,13 @@ fn grouped_match_count(dump: &str) -> Result<usize, Box<dyn std::error::Error>> 
     let users = parse_users(dump)?;
     let user_group: HashMap<i32, String> = users.into_iter().map(|u| (u.legacy_id, u.group_token)).collect();
     let scores = parse_jatekok(dump)?;
-    let mut keys: HashSet<(String, String, String)> = HashSet::new();
+    let mut keys: HashSet<(String, String, i32)> = HashSet::new();
     for s in scores {
         let token = user_group
             .get(&s.user_id)
             .ok_or_else(|| format!("Score references unknown user id {}", s.user_id))?
             .clone();
-        keys.insert((token, s.game_name, s.calendar));
+        keys.insert((token, s.game_name, s.legacy_match_id));
     }
     Ok(keys.len())
 }
@@ -326,11 +363,12 @@ fn parse_jatekok(dump: &str) -> Result<Vec<LegacyScore>, Box<dyn std::error::Err
             return Err(format!("jatekok tuple length mismatch: expected 6, got {}", fields.len()).into());
         }
         out.push(LegacyScore {
+            legacy_row_id: parse_i32(&fields[0])?,
             user_id: parse_i32(&fields[1])?,
             value: parse_i32(&fields[2])?,
-            round: parse_i32(&fields[3])?,
+            legacy_match_id: parse_i32(&fields[3])?,
             game_name: parse_string(&fields[4])?,
-            calendar: parse_string(&fields[5])?,
+            recorded_at: parse_legacy_calendar(&parse_string(&fields[5])?)?,
         });
     }
     Ok(out)
