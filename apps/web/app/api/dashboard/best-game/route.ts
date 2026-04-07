@@ -5,20 +5,22 @@ import type { ApiGame } from "@/types/api";
 export async function GET() {
   try {
     const games = await serverFetch<ApiGame[]>("/games");
-    if (games.length === 0) {
+    const finishedGames = games.filter((game) => game.status === "closed");
+    if (finishedGames.length === 0) {
       return NextResponse.json({
         value: "Nincs adat",
-        subLabel: "Meg nincs elinditott jatek",
+        subLabel: "Meg nincs lezart meccs",
       });
     }
 
-    const topGame = games.reduce((best, current) =>
+    const topGame = finishedGames.reduce((best, current) =>
       current.current_round > best.current_round ? current : best,
     );
+    const rounds = Math.max(0, topGame.current_round - 1);
 
     return NextResponse.json({
       value: `${topGame.name} ${topGame.icon}`,
-      subLabel: `${topGame.current_round} kor lett rogzitve`,
+      subLabel: `${rounds} kor lett rogzitve`,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Nem sikerült betölteni";

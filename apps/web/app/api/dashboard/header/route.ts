@@ -1,7 +1,15 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { serverFetch } from "@/lib/api/server";
-import type { ApiGame, ApiPlayer, ApiScoreRow } from "@/types/api";
+import type { ApiGame, ApiPlayer } from "@/types/api";
+
+interface ApiPlayerStat {
+  id: string;
+  username: string;
+  wins: number;
+  losses: number;
+  total_rounds: number;
+}
 
 function formatLastPlayed(date: Date | null) {
   if (!date) return "nincs adat";
@@ -37,26 +45,16 @@ export async function GET() {
     const currentUserId =
       claims && typeof claims.sub === "string" ? claims.sub : null;
 
-    const [games, players] = await Promise.all([
+    const [games, players, stats] = await Promise.all([
       serverFetch<ApiGame[]>("/games"),
       serverFetch<ApiPlayer[]>("/players"),
+      serverFetch<ApiPlayerStat[]>("/stats"),
     ]);
 
-    const latestScoreDates = await Promise.all(
-      games.map(async (game) => {
-        const scores = await serverFetch<ApiScoreRow[]>(`/games/${game.id}/scores`);
-        if (!scores.length) return null;
-        const latest = scores.reduce((best, row) =>
-          new Date(row.recorded_at).getTime() > new Date(best.recorded_at).getTime()
-            ? row
-            : best,
-        );
-        return new Date(latest.recorded_at);
-      }),
-    );
-
+    const finishedGames = games.filter((game) => game.status === "closed");
     const latestPlayed =
-      latestScoreDates
+      finishedGames
+        .map((game) => (game.closed_at ? new Date(game.closed_at) : null))
         .filter((d): d is Date => d !== null)
         .reduce<Date | null>((best, current) => {
           if (!best) return current;
@@ -66,9 +64,14 @@ export async function GET() {
       players.find((player) => player.id === currentUserId)?.username ??
       "Jatekos";
 
+    const totalMatches = stats.reduce(
+      (maxRounds, row) => Math.max(maxRounds, row.total_rounds),
+      0,
+    );
+
     return NextResponse.json({
       username: currentUser,
-      games: games.length,
+      games: totalMatches,
       players: players.length,
       lastPlayed: formatLastPlayed(latestPlayed),
     });

@@ -49,6 +49,7 @@ pub fn build(state: AppState) -> Router {
 
         // ── Stats ─────────────────────────────────────────────────────────────
         .route("/stats", get(stats::handlers::leaderboard))
+        .route("/stats/history", get(stats::handlers::history))
 
         // State is available to every handler via State<AppState>
         .with_state(state)

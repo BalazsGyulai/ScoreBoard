@@ -5,7 +5,7 @@ use axum::{
     Json,
 };
 
-use super::models::PlayerStat;
+use super::models::{PlayerPlacement, PlayerStat};
 use crate::{auth::middleware::AuthUser, AppState};
 
 // GET /stats — overall leaderboard for the caller's group
@@ -54,6 +54,43 @@ pub async fn leaderboard(auth: AuthUser, State(state): State<AppState>) -> Respo
                 })
                 .collect();
             Json(stats).into_response()
+        }
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
+}
+
+// GET /stats/history — per-snapshot placements for trend/streak calculations
+pub async fn history(auth: AuthUser, State(state): State<AppState>) -> Response {
+    let result = sqlx::query!(
+        r#"
+        SELECT
+            gr.snapshot_id,
+            gr.user_id,
+            gr.place,
+            g.closed_at
+        FROM game_results gr
+        JOIN games g ON g.id = gr.game_id
+        WHERE g.group_id = $1
+          AND g.closed_at IS NOT NULL
+        ORDER BY g.closed_at ASC, gr.snapshot_id ASC, gr.user_id ASC
+        "#,
+        auth.group_id,
+    )
+    .fetch_all(&state.db)
+    .await;
+
+    match result {
+        Ok(rows) => {
+            let placements: Vec<PlayerPlacement> = rows
+                .into_iter()
+                .map(|r| PlayerPlacement {
+                    snapshot_id: r.snapshot_id,
+                    user_id: r.user_id,
+                    place: r.place,
+                    closed_at: r.closed_at.expect("closed_at filtered by query").to_rfc3339(),
+                })
+                .collect();
+            Json(placements).into_response()
         }
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }

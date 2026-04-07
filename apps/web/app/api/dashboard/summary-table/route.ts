@@ -9,19 +9,44 @@ interface ApiPlayerStat {
   total_rounds: number;
 }
 
-function buildTrend(seed: number) {
-  return Array.from({ length: 7 }, (_, i) => 3 + ((seed + i * 2) % 6));
+interface ApiPlacement {
+  snapshot_id: string;
+  user_id: string;
+  place: number;
+  closed_at: string;
+}
+
+function currentWinningStreak(places: number[]) {
+  let streak = 0;
+  for (let i = places.length - 1; i >= 0; i -= 1) {
+    if (places[i] !== 1) break;
+    streak += 1;
+  }
+  return streak;
 }
 
 export async function GET() {
   try {
-    const stats = await serverFetch<ApiPlayerStat[]>("/stats");
+    const [stats, placements] = await Promise.all([
+      serverFetch<ApiPlayerStat[]>("/stats"),
+      serverFetch<ApiPlacement[]>("/stats/history"),
+    ]);
+
+    const placesByUser = new Map<string, number[]>();
+    for (const row of placements) {
+      const list = placesByUser.get(row.user_id) ?? [];
+      list.push(row.place);
+      placesByUser.set(row.user_id, list);
+    }
+
     const rows = stats
       .map((row) => {
         const winRate =
           row.total_rounds > 0
             ? Math.round((row.wins / row.total_rounds) * 100)
             : 0;
+        const placeHistory = placesByUser.get(row.id) ?? [];
+        const trend = placeHistory.slice(-7);
         return {
           id: row.id,
           username: row.username,
@@ -29,8 +54,8 @@ export async function GET() {
           losses: row.losses,
           total_rounds: row.total_rounds,
           win_rate: winRate,
-          streak: Math.max(1, Math.round(row.wins / 2)),
-          trend: buildTrend(row.wins + row.losses),
+          streak: currentWinningStreak(placeHistory),
+          trend,
         };
       })
       .sort((a, b) => {

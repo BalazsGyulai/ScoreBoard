@@ -9,3 +9,11 @@ pub struct PlayerStat {
     pub losses: i64,
     pub total_rounds: i64,
 }
+
+#[derive(Debug, Clone, Serialize)]
+pub struct PlayerPlacement {
+    pub snapshot_id: Uuid,
+    pub user_id: Uuid,
+    pub place: i32,
+    pub closed_at: String,
+}
