@@ -176,7 +176,7 @@ export default function Dashboard() {
                     : "";
             return (
               <Link
-                href={`/players/${i}`}
+                href={`/players/${p.id}`}
                 key={p.id}
                 className={styles["lb-row"]}
               >

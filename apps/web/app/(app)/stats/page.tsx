@@ -93,7 +93,7 @@ export default function StatsPage() {
                     : "";
             return (
               <Link
-                href={`/players/${i}`}
+                href={`/players/${p.id}`}
                 key={p.id}
                 className={styles["lb-row"]}
               >
@@ -149,7 +149,7 @@ export default function StatsPage() {
                 </tr>
               </thead>
               <tbody>
-                {summary.map((p, i) => {
+                {summary.map((p) => {
                   const pct = p.win_rate;
                   const barColor =
                     pct >= 60
@@ -161,7 +161,7 @@ export default function StatsPage() {
                     <tr key={p.id}>
                       <td>
                         <Link
-                          href={`/players/${i}`}
+                          href={`/players/${p.id}`}
                           style={{
                             display: "flex",
                             alignItems: "center",

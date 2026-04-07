@@ -1,34 +1,245 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
+import useSWR from "swr";
 import StatisticCard from "@/components/ui/statisticCard";
 import ActionButton from "@/components/ui/actionButton";
-import {
-  players,
-  avatarColors,
-  gameBreakdown,
-  activityData,
-  activityLabels,
-  rivals,
-} from "@/lib/mockData";
+import type { ApiGame, ApiPlayer, ApiScoreRow } from "@/types/api";
 import styles from "./player.module.css";
+
+type LeaderboardRow = {
+  id: string;
+  username: string;
+  wins: number;
+  losses: number;
+  total_rounds: number;
+  win_rate: number;
+};
+
+type SummaryTableRow = LeaderboardRow & {
+  streak: number;
+  trend: number[];
+};
+
+type RivalRow = {
+  name: string;
+  pct: number;
+  color: string;
+};
+
+type GameBreakdownRow = {
+  name: string;
+  icon: string;
+  wins: number;
+  losses: number;
+  games: number;
+};
+
+type PlayerDerivedData = {
+  gameBreakdown: GameBreakdownRow[];
+  activityData: number[];
+  activityLabels: string[];
+  rivals: RivalRow[];
+  bestGameName: string;
+};
+
+async function fetchJson<T>(url: string): Promise<T> {
+  const res = await fetch(url, {
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    let message = `Hiba (${res.status})`;
+    try {
+      const data = (await res.json()) as { error?: string };
+      message = data.error ?? message;
+    } catch {
+      // ignore parse errors
+    }
+    throw new Error(message);
+  }
+
+  return res.json() as Promise<T>;
+}
+
+function avatarColor(seed: string) {
+  const palette = ["#0F172A", "#475569", "#B45309", "#94A3B8", "#CBD5E1", "#E2E8F0", "#F1F5F9"];
+  const hash = [...seed].reduce((acc, c) => acc + c.charCodeAt(0), 0);
+  return palette[hash % palette.length];
+}
+
+function monthLabel(date: Date) {
+  return date.toLocaleDateString("hu-HU", { month: "short" });
+}
+
+function rivalColor(pct: number) {
+  if (pct >= 60) return "var(--success)";
+  if (pct >= 40) return "var(--orange)";
+  return "var(--danger)";
+}
+
+function winnerBetween(a: number, b: number, winnerRule: ApiGame["winner_rule"]) {
+  return winnerRule === "min" ? a < b : a > b;
+}
 
 export default function PlayerPage() {
   const params = useParams();
   const router = useRouter();
-  const idx = Number(params.id) || 0;
-  const p = players[idx] ?? players[0];
-  const pct = Math.round((p.wins / p.games) * 100);
-  const actMax = Math.max(...activityData);
+  const routeParam = String(params.id ?? "");
+
+  const { data: players } = useSWR<ApiPlayer[]>("/api/players", fetchJson);
+  const { data: leaderboardRows } = useSWR<LeaderboardRow[]>("/api/dashboard/leaderboard", fetchJson);
+  const { data: summaryRows } = useSWR<SummaryTableRow[]>("/api/dashboard/summary-table", fetchJson);
+  const { data: games } = useSWR<ApiGame[]>("/api/games", fetchJson);
+
+  const orderedRows = leaderboardRows ?? [];
+  const fallbackIdx = Number(routeParam);
+  const selectedFromId = orderedRows.findIndex((row) => row.id === routeParam);
+  const selectedIndex =
+    selectedFromId >= 0
+      ? selectedFromId
+      : Number.isFinite(fallbackIdx) && fallbackIdx >= 0 && fallbackIdx < orderedRows.length
+        ? fallbackIdx
+        : 0;
+
+  const selected = orderedRows[selectedIndex] ?? null;
+
+  const { data: derivedData } = useSWR<PlayerDerivedData>(
+    selected && games ? ["player-derived", selected.id, games.map((g) => g.id).join(",")] : null,
+    async () => {
+      if (!selected || !games) {
+        return {
+          gameBreakdown: [],
+          activityData: [],
+          activityLabels: [],
+          rivals: [],
+          bestGameName: "N/A",
+        };
+      }
+
+      const scoreRowsByGame = await Promise.all(
+        games.map(async (game) => ({
+          game,
+          scores: await fetchJson<ApiScoreRow[]>(`/api/games/${game.id}/scores`),
+        })),
+      );
+
+      const gameBreakdown: GameBreakdownRow[] = [];
+      const monthlyCounts = new Map<string, number>();
+      const rivalDuelMap = new Map<string, { wins: number; total: number }>();
+
+      for (const { game, scores } of scoreRowsByGame) {
+        const rounds = new Map<number, ApiScoreRow[]>();
+        for (const s of scores) {
+          if (!rounds.has(s.round)) rounds.set(s.round, []);
+          rounds.get(s.round)!.push(s);
+          if (s.user_id === selected.id) {
+            const d = new Date(s.recorded_at);
+            const key = `${d.getFullYear()}-${d.getMonth()}`;
+            monthlyCounts.set(key, (monthlyCounts.get(key) ?? 0) + 1);
+          }
+        }
+
+        let wins = 0;
+        let losses = 0;
+        for (const roundScores of rounds.values()) {
+          const me = roundScores.find((r) => r.user_id === selected.id);
+          if (!me) continue;
+
+          const values = roundScores.map((r) => r.value);
+          const best = game.winner_rule === "min" ? Math.min(...values) : Math.max(...values);
+          if (me.value === best) wins += 1;
+          else losses += 1;
+
+          for (const other of roundScores) {
+            if (other.user_id === selected.id) continue;
+            const duel = rivalDuelMap.get(other.user_id) ?? { wins: 0, total: 0 };
+            duel.total += 1;
+            if (winnerBetween(me.value, other.value, game.winner_rule)) duel.wins += 1;
+            rivalDuelMap.set(other.user_id, duel);
+          }
+        }
+
+        if (wins + losses > 0) {
+          gameBreakdown.push({
+            name: game.name,
+            icon: game.icon,
+            wins,
+            losses,
+            games: wins + losses,
+          });
+        }
+      }
+
+      gameBreakdown.sort((a, b) => b.games - a.games || b.wins - a.wins);
+      const bestGame =
+        gameBreakdown.length > 0
+          ? [...gameBreakdown].sort(
+              (a, b) => b.wins / b.games - a.wins / a.games || b.games - a.games,
+            )[0]
+          : null;
+
+      const now = new Date();
+      const lastSixMonths = Array.from({ length: 6 }, (_, i) => {
+        const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+        return {
+          key: `${d.getFullYear()}-${d.getMonth()}`,
+          label: monthLabel(d),
+        };
+      });
+
+      const activityLabels = lastSixMonths.map((m) => m.label);
+      const activityData = lastSixMonths.map((m) => monthlyCounts.get(m.key) ?? 0);
+
+      const rivals = Array.from(rivalDuelMap.entries())
+        .map(([userId, duel]) => {
+          const rivalName = players?.find((p) => p.id === userId)?.username ?? "Ismeretlen";
+          const pct = duel.total > 0 ? Math.round((duel.wins / duel.total) * 100) : 0;
+          return {
+            name: rivalName,
+            pct,
+            total: duel.total,
+            color: rivalColor(pct),
+          };
+        })
+        .filter((r) => r.total > 0)
+        .sort((a, b) => b.total - a.total || b.pct - a.pct)
+        .slice(0, 3)
+        .map(({ name, pct, color }) => ({ name, pct, color }));
+
+      return {
+        gameBreakdown,
+        activityData,
+        activityLabels,
+        rivals,
+        bestGameName: bestGame?.name ?? "N/A",
+      };
+    },
+  );
+
+  const pct = selected?.win_rate ?? 0;
+  const totalGames = selected?.total_rounds ?? 0;
+  const wins = selected?.wins ?? 0;
+  const losses = selected?.losses ?? 0;
+  const streak = summaryRows?.find((row) => row.id === selected?.id)?.streak ?? 0;
+  const activityData = derivedData?.activityData ?? [];
+  const activityLabels = derivedData?.activityLabels ?? [];
+  const gameBreakdown = derivedData?.gameBreakdown ?? [];
+  const rivals = derivedData?.rivals ?? [];
+  const actMax = Math.max(...activityData, 1);
 
   function prev() {
-    const i = (idx - 1 + players.length) % players.length;
-    router.push(`/players/${i}`);
+    if (!orderedRows.length) return;
+    const i = (selectedIndex - 1 + orderedRows.length) % orderedRows.length;
+    router.push(`/players/${orderedRows[i].id}`);
   }
 
   function next() {
-    const i = (idx + 1) % players.length;
-    router.push(`/players/${i}`);
+    if (!orderedRows.length) return;
+    const i = (selectedIndex + 1) % orderedRows.length;
+    router.push(`/players/${orderedRows[i].id}`);
   }
 
   return (
@@ -37,15 +248,15 @@ export default function PlayerPage() {
       <div className={styles["player-hdr"]}>
         <div
           className={`${styles.avatar} ${styles.av64}`}
-          style={{ background: avatarColors[idx] ?? "#0F172A", color: "#fff" }}
+          style={{ background: avatarColor(selected?.id ?? "fallback"), color: "#fff" }}
         >
-          {p.name[0]}
+          {selected?.username?.[0] ?? "?"}
         </div>
         <div className={styles["player-hdr-info"]}>
-          <div className={styles["player-pid"]}>{p.id}</div>
-          <h1>{p.name}</h1>
+          <div className={styles["player-pid"]}>{selected?.id ?? "..."}</div>
+          <h1>{selected?.username ?? "Betöltés..."}</h1>
           <div className={styles["player-sub"]}>
-            {p.games} meccsből {p.wins} megnyerve · Legjobb: Skyjo
+            {totalGames} meccsből {wins} megnyerve · Legjobb: {derivedData?.bestGameName ?? "..."}
           </div>
         </div>
         <div className={styles["player-nav"]}>
@@ -59,17 +270,17 @@ export default function PlayerPage() {
         <StatisticCard label="Győzelmi arány" value={`${pct}%`} dark />
         <StatisticCard
           label="Győzelmek"
-          value={String(p.wins)}
-          subLabel={`${p.games} meccsből`}
+          value={String(wins)}
+          subLabel={`${totalGames} meccsből`}
         />
         <StatisticCard
           label="Vesztések"
-          value={String(p.losses)}
-          subLabel={`${p.games} meccsből`}
+          value={String(losses)}
+          subLabel={`${totalGames} meccsből`}
         />
         <StatisticCard
           label="Legjobb sorozat"
-          value={`${3 + idx} 🔥`}
+          value={`${streak} 🔥`}
           subLabel="egymás utáni győzelem"
         />
       </div>
