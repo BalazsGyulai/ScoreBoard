@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE scores\n        SET value = $1\n        FROM games\n        WHERE scores.id = $2\n          AND scores.game_id = games.id\n          AND games.group_id = $3\n        RETURNING scores.value\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "value",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "2f7efa0ba5c31f08c1d3063e008d9f335c48110623f5f3b018606b5b2c1c7d8b"
+}

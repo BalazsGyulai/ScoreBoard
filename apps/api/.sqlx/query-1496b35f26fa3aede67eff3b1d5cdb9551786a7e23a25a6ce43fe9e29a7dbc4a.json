@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT snapshot_id, MAX(archived_at) AS \"archived_at!\"\n        FROM score_archives\n        WHERE game_id = $1\n        GROUP BY snapshot_id\n        ORDER BY MAX(archived_at) DESC\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "snapshot_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "archived_at!",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      null
+    ]
+  },
+  "hash": "1496b35f26fa3aede67eff3b1d5cdb9551786a7e23a25a6ce43fe9e29a7dbc4a"
+}

@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            gr.snapshot_id,\n            gr.game_id,\n            gr.user_id,\n            gr.place,\n            g.closed_at\n        FROM game_results gr\n        JOIN games g ON g.id = gr.game_id\n        WHERE g.group_id = $1\n          AND g.closed_at IS NOT NULL\n        ORDER BY g.closed_at ASC, gr.snapshot_id ASC, gr.user_id ASC\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "snapshot_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "game_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "place",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 4,
+        "name": "closed_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "7ab6c8e010067585563243b6525f6ffac31dd0c4ca43f1c2363b7b7518d80b97"
+}

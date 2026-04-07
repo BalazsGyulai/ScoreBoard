@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        WITH ranked_results AS (\n            SELECT\n                gr.snapshot_id,\n                gr.user_id,\n                gr.place,\n                MAX(gr.place) OVER (PARTITION BY gr.snapshot_id) AS worst_place,\n                COUNT(*) OVER (PARTITION BY gr.snapshot_id) AS player_count\n            FROM game_results gr\n            JOIN games g ON g.id = gr.game_id\n            WHERE g.group_id = $1\n        )\n        SELECT\n            u.id,\n            u.username,\n            COALESCE(SUM(CASE WHEN rr.place = 1 THEN 1 ELSE 0 END), 0) AS wins,\n            COALESCE(SUM(CASE WHEN rr.player_count > 1 AND rr.worst_place > 1 AND rr.place = rr.worst_place THEN 1 ELSE 0 END), 0) AS losses,\n            COALESCE(COUNT(rr.snapshot_id), 0) AS total_rounds\n        FROM users u\n        LEFT JOIN ranked_results rr ON rr.user_id = u.id\n        WHERE u.group_id = $1\n        GROUP BY u.id, u.username\n        ORDER BY wins DESC, losses ASC\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "username",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "wins",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "losses",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "total_rounds",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "2a8d71f68b0cddebe8de7c3c22748860bb67541cb93a39050dddf08d588915a8"
+}
