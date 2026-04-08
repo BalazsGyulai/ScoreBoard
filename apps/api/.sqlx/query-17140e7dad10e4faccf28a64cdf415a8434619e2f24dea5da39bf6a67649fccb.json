@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT s.id, s.user_id, u.username, s.round, s.value\n           FROM scores s\n           JOIN users u ON u.id = s.user_id\n           WHERE s.game_id = $1\n           ORDER BY s.round ASC, u.username ASC",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "username",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "round",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 4,
+        "name": "value",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "17140e7dad10e4faccf28a64cdf415a8434619e2f24dea5da39bf6a67649fccb"
+}

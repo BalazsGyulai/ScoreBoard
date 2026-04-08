@@ -1,0 +1,35 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: homegame
+      POSTGRES_USER: homegame
+      POSTGRES_PASSWORD: qEST8IpmmXEakQ==
+    volumes:
+      - pgdata:/var/lib/postgresql/data   # ← persists across restarts
+
+  api:
+    image: ghcr.io/balazsgyulai/scoreboard-api:latest
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://homegame:qEST8IpmmXEakQ==@db:5432/homegame
+      JWT_SECRET: ufqPMfPZ5Fq70zwShjQIRh+zxabG0vxA3mUAZcNep4Y=
+      REFRESH_TOKEN_SECRET: Fzbt1L0VwhF9dx36cCkPFtbPsRvNGavfofNc5Ai0WWM=
+      PORT: 8080
+    depends_on:
+      - db
+    # NOT exposed to host — only reachable inside Docker network
+
+  web:
+    image: ghcr.io/balazsgyulai/scoreboard-web:latest
+    restart: unless-stopped
+    environment:
+      API_URL: http://api:8080
+    ports:
+      - "127.0.0.1:3100:3000"    # host:3100 → container:3000
+    depends_on:
+      - api
+
+volumes:
+  pgdata:

@@ -19,10 +19,7 @@ services:
       retries: 20
 
   api:
-    build:
-      context: .
-      dockerfile: apps/api/Dockerfile
-    container_name: homegame-api
+    image: ghcr.io/balazsgyulai/scoreboard-api:latest
     restart: unless-stopped
     depends_on:
       db:
@@ -38,12 +35,7 @@ services:
       - "8080:8080"
 
   web:
-    build:
-      context: .
-      dockerfile: apps/web/Dockerfile
-      args:
-        API_URL: http://api:8080
-    container_name: homegame-web
+    image: ghcr.io/balazsgyulai/scoreboard-web:latest
     restart: unless-stopped
     depends_on:
       api:
