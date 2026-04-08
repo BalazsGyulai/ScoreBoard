@@ -1,0 +1,73 @@
+syntax = "proto3";
+
+package homegame;
+
+// Service for streaming live game updates to viewers.
+service GameStream {
+  // Subscribe to live game events. The server sends an initial full state
+  // snapshot, then streams delta events as the game progresses.
+  rpc WatchGame(WatchGameRequest) returns (stream GameEvent);
+}
+
+// ── Request ──────────────────────────────────────────────────────────────────
+
+message WatchGameRequest {
+  // The share token issued by the game leader.
+  string token = 1;
+}
+
+// ── Events ───────────────────────────────────────────────────────────────────
+
+message GameEvent {
+  oneof event {
+    // Full state snapshot — always the first message on the stream.
+    GameStateSnapshot init = 1;
+
+    // Scores changed (round added or individual score edited).
+    ScoresUpdated scores_updated = 2;
+
+    // Game was closed — final standings calculated.
+    GameClosed game_closed = 3;
+
+    // Game was restarted — back to open, scores cleared.
+    GameRestarted game_restarted = 4;
+  }
+}
+
+// ── Payloads ─────────────────────────────────────────────────────────────────
+
+message GameStateSnapshot {
+  GameInfo game = 1;
+  repeated PlayerInfo players = 2;
+  repeated ScoreRow scores = 3;
+}
+
+message ScoresUpdated {}
+
+message GameClosed {}
+
+message GameRestarted {}
+
+// ── Shared types ─────────────────────────────────────────────────────────────
+
+message GameInfo {
+  string id = 1;
+  string name = 2;
+  string icon = 3;
+  string winner_rule = 4;  // "min" or "max"
+  int32 current_round = 5;
+  string status = 6;       // "open" or "closed"
+}
+
+message PlayerInfo {
+  string id = 1;
+  string username = 2;
+}
+
+message ScoreRow {
+  string id = 1;
+  string user_id = 2;
+  string username = 3;
+  int32 round = 4;
+  int32 value = 5;
+}

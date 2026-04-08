@@ -7,7 +7,7 @@ use axum::{
 use uuid::Uuid;
 
 use super::models::{CloseGameResponse, CreateGameRequest, Game, GameResult};
-use crate::{auth::middleware::AuthUser, AppState};
+use crate::{auth::middleware::AuthUser, sse::broadcaster::GameEvent, AppState};
 
 fn is_leader(role: &str) -> bool {
     role == "leader"
@@ -266,6 +266,8 @@ pub async fn close_game(
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
 
+    state.broadcaster.notify(game_id, GameEvent::GameClosed);
+
     Json(CloseGameResponse { game_id, results }).into_response()
 }
 
@@ -326,6 +328,8 @@ pub async fn restart_game(
     if tx.commit().await.is_err() {
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
+
+    state.broadcaster.notify(game_id, GameEvent::GameRestarted);
 
     Json(serde_json::json!({ "status": "open" })).into_response()
 }

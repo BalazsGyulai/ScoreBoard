@@ -7,7 +7,7 @@ use axum::{
 use uuid::Uuid;
 
 use super::models::{AddRoundRequest, ScoreQuery, ScoreRow, ScoreSnapshotRow, UpdateScoreRequest};
-use crate::{auth::middleware::AuthUser, AppState};
+use crate::{auth::middleware::AuthUser, sse::broadcaster::GameEvent, AppState};
 
 fn is_leader(role: &str) -> bool {
     role == "leader"
@@ -185,6 +185,8 @@ pub async fn add_round(
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
 
+    state.broadcaster.notify(game_id, GameEvent::ScoresUpdated);
+
     (StatusCode::CREATED, Json(serde_json::json!({ "round": current_round }))).into_response()
 }
 
@@ -209,7 +211,7 @@ pub async fn update_score(
         WHERE scores.id = $2
           AND scores.game_id = games.id
           AND games.group_id = $3
-        RETURNING scores.value
+        RETURNING scores.value, scores.game_id
         "#,
         body.value,
         score_id,
@@ -219,7 +221,10 @@ pub async fn update_score(
     .await;
 
     match result {
-        Ok(Some(_)) => Json(serde_json::json!({ "value": body.value })).into_response(),
+        Ok(Some(row)) => {
+            state.broadcaster.notify(row.game_id, GameEvent::ScoresUpdated);
+            Json(serde_json::json!({ "value": body.value })).into_response()
+        }
         Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "Score not found or access denied" }))).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() }))).into_response(),
     }

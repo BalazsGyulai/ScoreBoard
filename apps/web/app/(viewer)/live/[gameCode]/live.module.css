@@ -1,0 +1,209 @@
+/* ── Live viewer page ── */
+
+.live-wrap {
+  min-height: 100vh;
+  background: var(--bg);
+  padding: 32px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.live-hdr {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.live-hdr h1 {
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+
+.live-hdr .icon {
+  font-size: 32px;
+  margin-bottom: 4px;
+  display: block;
+}
+
+.live-sub {
+  font-size: 13px;
+  color: var(--slate-500);
+  margin-top: 4px;
+}
+
+.status-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 12px;
+  border-radius: 99px;
+  margin-bottom: 20px;
+}
+
+.status-connected {
+  background: var(--success-lt);
+  color: #065F46;
+}
+
+.status-connecting {
+  background: #FEF3C7;
+  color: #92400E;
+}
+
+.status-disconnected {
+  background: var(--danger-lt);
+  color: var(--danger);
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.status-connected .status-dot {
+  background: #059669;
+}
+
+.status-connecting .status-dot {
+  background: #D97706;
+}
+
+.status-disconnected .status-dot {
+  background: var(--danger);
+}
+
+/* ── Table ── */
+
+.tbl-wrap {
+  width: 100%;
+  max-width: 900px;
+  border-radius: 16px;
+  border: 1px solid var(--slate-200);
+  overflow: hidden;
+  background: var(--card);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 20px rgba(0, 0, 0, 0.04);
+}
+
+.scroll-hint {
+  overflow-x: auto;
+}
+
+.score-tbl {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 480px;
+}
+
+.score-tbl th:first-child,
+.score-tbl td:first-child {
+  position: sticky;
+  left: 0;
+  background: var(--card);
+  z-index: 2;
+  text-align: left;
+  min-width: 72px;
+}
+
+.score-tbl .total-row td:first-child {
+  background: var(--slate-100);
+}
+
+.score-tbl thead th {
+  padding: 18px 14px;
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--slate-900);
+  border-bottom: 2px solid var(--slate-100);
+  text-align: center;
+}
+
+.total-row {
+  background: var(--slate-100);
+}
+
+.total-row td {
+  padding: 15px 14px;
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-align: center;
+  border-bottom: 2px solid var(--slate-200);
+}
+
+.total-row td:first-child {
+  font-family: "DM Sans", sans-serif;
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--slate-500);
+}
+
+.winner-col {
+  color: var(--success);
+}
+
+.loser-col {
+  color: var(--danger);
+}
+
+.score-tbl tbody tr:not(.total-row) {
+  border-bottom: 1px solid var(--slate-100);
+}
+
+.score-tbl tbody td {
+  padding: 11px 14px;
+  font-size: 15px;
+  color: var(--slate-700);
+  text-align: center;
+}
+
+.score-tbl tbody td:first-child {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--slate-500);
+}
+
+/* ── Error/loading states ── */
+
+.center-msg {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  text-align: center;
+  color: var(--slate-500);
+  font-size: 15px;
+  gap: 8px;
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.game-closed-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 99px;
+  background: var(--slate-100);
+  color: var(--slate-600);
+  margin-top: 8px;
+}

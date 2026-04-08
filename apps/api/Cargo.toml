@@ -38,11 +38,19 @@ tracing            = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # SSE streaming
-tokio-stream = "0.1"
+tokio-stream = { version = "0.1", features = ["sync"] }
 
 # Timestamps
 chrono = { version = "0.4", features = ["serde"] }
 dotenvy = "0.15"
+
+# gRPC (learning implementation alongside SSE)
+tonic     = "0.13"
+tonic-web = "0.13"
+prost     = "0.13"
+
+[build-dependencies]
+tonic-build = "0.13"
 
 [dev-dependencies]
 # Integration test helper for axum 0.8

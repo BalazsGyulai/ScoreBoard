@@ -57,6 +57,14 @@ const nextConfig: NextConfig = {
         source: "/api/stats/history",
         destination: `${API_URL}/stats/history`,
       },
+      {
+        source: "/api/games/:id/share",
+        destination: `${API_URL}/games/:id/share`,
+      },
+      {
+        source: "/api/live/:token/stream",
+        destination: `${API_URL}/live/:token/stream`,
+      },
     ];
   },
 };

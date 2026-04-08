@@ -4,8 +4,8 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import useSWR from "swr";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut, X, Eye, Loader2, Plus } from "lucide-react";
-import type { ApiError, ApiGame, ApiPlayer, ApiScoreRow } from "@/types/api";
+import { LogOut, X, Eye, Loader2, Plus, Copy, Check } from "lucide-react";
+import type { ApiError, ApiGame, ApiPlayer, ApiScoreRow, ViewerTokenResponse } from "@/types/api";
 import { readHiddenPlayerIds, writeHiddenPlayerIds } from "@/lib/playerVisibility";
 import styles from "./sidebarSettings.module.css";
 
@@ -26,6 +26,9 @@ export default function SidebarSettins({
         revalidateIfStale: false,
     });
     const canAddPlayer = me?.role === "leader";
+    const [shareLoading, setShareLoading] = useState(false);
+    const [shareData, setShareData] = useState<{ sharing: boolean; token?: string; share_url?: string } | null>(null);
+    const [copied, setCopied] = useState(false);
     const {
         data: players,
         isLoading: playersLoading,
@@ -133,6 +136,58 @@ export default function SidebarSettins({
             writeHiddenPlayerIds(hiddenIds);
             return next;
         });
+    }
+
+    // ── Sharing ──
+    useEffect(() => {
+        if (!activeGame || !canAddPlayer) {
+            setShareData(null);
+            return;
+        }
+        let cancelled = false;
+        (async () => {
+            try {
+                const res = await fetch(`/api/games/${activeGame.id}/share`, {
+                    credentials: "include",
+                });
+                if (!res.ok) return;
+                const data = await res.json();
+                if (!cancelled) setShareData(data);
+            } catch { /* ignore */ }
+        })();
+        return () => { cancelled = true; };
+    }, [activeGame, canAddPlayer]);
+
+    async function toggleSharing() {
+        if (!activeGame || shareLoading) return;
+        setShareLoading(true);
+        try {
+            if (shareData?.sharing) {
+                await fetch(`/api/games/${activeGame.id}/share`, {
+                    method: "DELETE",
+                    credentials: "include",
+                });
+                setShareData({ sharing: false });
+            } else {
+                const res = await fetch(`/api/games/${activeGame.id}/share`, {
+                    method: "POST",
+                    credentials: "include",
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    setShareData({ sharing: true, token: data.token, share_url: data.share_url });
+                }
+            }
+        } catch { /* ignore */ }
+        setShareLoading(false);
+    }
+
+    function copyShareUrl() {
+        if (!shareData?.share_url) return;
+        const fullUrl = `${window.location.origin}${shareData.share_url}`;
+        navigator.clipboard.writeText(fullUrl);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
     }
 
     async function fetchJson<T>(url: string): Promise<T> {
@@ -276,6 +331,39 @@ export default function SidebarSettins({
                         <span className={styles["s-row-val"]}>{winnerPreview}</span>
                     </div>
                 </div>
+
+                {/* ── Sharing ── */}
+                {activeGame && canAddPlayer && (
+                    <div className={styles["share-section"]}>
+                        <div className={styles["s-label"]}>Megosztas</div>
+                        <div className={styles["share-toggle-row"]}>
+                            <span className={styles["share-toggle-label"]}>
+                                {shareData?.sharing && <span className={styles["share-dot"]} />}
+                                {shareData?.sharing ? "Megosztva" : "Nincs megosztva"}
+                            </span>
+                            <button
+                                className={`${styles.toggle} ${shareData?.sharing ? styles.on : ""}`}
+                                onClick={toggleSharing}
+                                disabled={shareLoading}
+                                title={shareData?.sharing ? "Megosztas kikapcsolasa" : "Megosztas bekapcsolasa"}
+                            />
+                        </div>
+                        {shareData?.sharing && shareData.share_url && (
+                            <div className={styles["share-url-box"]}>
+                                <span className={styles["share-url-text"]}>
+                                    {`${typeof window !== "undefined" ? window.location.origin : ""}${shareData.share_url}`}
+                                </span>
+                                <button
+                                    className={`${styles["share-copy-btn"]} ${copied ? styles.copied : ""}`}
+                                    onClick={copyShareUrl}
+                                    title="Link masolasa"
+                                >
+                                    {copied ? <Check size={12} /> : <Copy size={12} />}
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 {/* ── Actions ── */}
                 <div className={styles.actions}>

@@ -11,12 +11,16 @@
     "test:run": "vitest run"
   },
   "dependencies": {
+    "@bufbuild/protobuf": "^2",
+    "@connectrpc/connect": "^2.1.1",
+    "@connectrpc/connect-web": "^2.1.1",
     "next": "^15.5.14",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "swr": "^2.4.1"
   },
   "devDependencies": {
+    "@bufbuild/protoc-gen-es": "^2.11.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^20",

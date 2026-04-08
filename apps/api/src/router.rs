@@ -1,4 +1,4 @@
-use crate::{auth::handlers, games, players, scores, stats, AppState};
+use crate::{auth::handlers, games, players, scores, sse, stats, AppState};
 use axum::{
     routing::{delete, get, post},
     Router,
@@ -14,7 +14,19 @@ pub fn build(state: AppState) -> Router {
         .allow_headers([CONTENT_TYPE, AUTHORIZATION])
         .allow_credentials(true); // required for HttpOnly cookies to be sent cross-origin
 
-    Router::new()
+    // SSE stream uses permissive CORS — viewers connect cross-origin with only a
+    // URL token for auth (no cookies). Mounted separately so it doesn't inherit
+    // the credential-based CORS from the main API routes.
+    let live_cors = CorsLayer::new()
+        .allow_origin(tower_http::cors::Any)
+        .allow_methods([Method::GET]);
+
+    let live_routes = Router::new()
+        .route("/live/{token}/stream", get(sse::handlers::stream))
+        .with_state(state.clone())
+        .layer(live_cors);
+
+    let api_routes = Router::new()
         // ── Auth ──────────────────────────────────────────────────────────────
         .route("/auth/register", post(handlers::register))
         .route("/auth/login",    post(handlers::login))
@@ -59,7 +71,18 @@ pub fn build(state: AppState) -> Router {
         .route("/stats", get(stats::handlers::leaderboard))
         .route("/stats/history", get(stats::handlers::history))
 
+        // ── Sharing ──────────────────────────────────────────────────────────
+        .route(
+            "/games/{id}/share",
+            get(sse::handlers::get_share)
+                .post(sse::handlers::create_share)
+                .delete(sse::handlers::delete_share),
+        )
+
         // State is available to every handler via State<AppState>
         .with_state(state)
-        .layer(cors)
+        .layer(cors);
+
+    // Merge both routers — live routes checked first.
+    live_routes.merge(api_routes)
 }

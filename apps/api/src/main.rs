@@ -1,5 +1,7 @@
-use api::{config::Config, router, AppState};
+use api::{config::Config, grpc::GameStreamService, router, AppState};
 use api::db::pool::create_pool;
+use api::sse::broadcaster::Broadcaster;
+use std::sync::Arc;
 
 #[tokio::main]
 async fn main() {
@@ -16,11 +18,34 @@ async fn main() {
     let state = AppState {
         db,
         config: config.clone(),
+        broadcaster: Arc::new(Broadcaster::new()),
     };
-    let app = router::build(state);
-    let addr = format!("0.0.0.0:{}", config.port);
 
-    tracing::info!("API listening on {addr}");
-    let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
-    axum::serve(listener, app).await.unwrap();
+    // ── HTTP/REST + SSE server (primary) ─────────────────────────────────
+    let app = router::build(state.clone());
+    let http_addr = format!("0.0.0.0:{}", config.port);
+
+    // ── gRPC server (learning implementation on port+1) ──────────────────
+    let grpc_port = config.port + 1;
+    let grpc_addr = format!("0.0.0.0:{grpc_port}").parse().unwrap();
+    let grpc_service = GameStreamService::new(state).into_server();
+
+    tracing::info!("API listening on {http_addr}");
+    tracing::info!("gRPC-web listening on {grpc_addr}");
+
+    let http_listener = tokio::net::TcpListener::bind(&http_addr).await.unwrap();
+
+    // Run both servers concurrently.
+    tokio::select! {
+        res = axum::serve(http_listener, app) => {
+            if let Err(e) = res { tracing::error!("HTTP server error: {e}"); }
+        }
+        res = tonic::transport::Server::builder()
+            .accept_http1(true) // required for gRPC-web (browser clients)
+            .layer(tonic_web::GrpcWebLayer::new())
+            .add_service(grpc_service)
+            .serve(grpc_addr) => {
+            if let Err(e) = res { tracing::error!("gRPC server error: {e}"); }
+        }
+    }
 }

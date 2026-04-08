@@ -3,12 +3,13 @@
 import Link from "next/link";
 import Button from "./button";
 import styles from "./navigation.module.css";
-import { Settings, Plus } from "lucide-react";
+import { Settings, Plus, Trophy, TrendingDown } from "lucide-react";
 import NavItem from "./navItem";
 import SidebarSettins from "./sidebarSettings";
 import { useState } from "react";
 import { usePathname } from "next/navigation";
 import useSWR from "swr";
+import type { ApiGame } from "@/types/api";
 
 type MeResponse = { role: string };
 
@@ -22,6 +23,10 @@ async function fetchJson<T>(url: string): Promise<T> {
     throw new Error(`Hiba (${res.status})`);
   }
   return res.json() as Promise<T>;
+}
+
+function slugify(name: string) {
+  return name.trim().toLowerCase();
 }
 
 export default function Navigation() {
@@ -41,6 +46,20 @@ export default function Navigation() {
       : pathname.startsWith("/dashboard")
         ? "dashboard"
         : "";
+
+  // Detect if we're on a specific game page (not /games or /games/new)
+  const gameSlugMatch = pathname.match(/^\/games\/([^/]+)$/);
+  const gameSlug = gameSlugMatch && gameSlugMatch[1] !== "new" ? gameSlugMatch[1] : null;
+
+  const { data: games } = useSWR<ApiGame[]>(
+    gameSlug ? "/api/games" : null,
+    fetchJson,
+    { revalidateOnFocus: false },
+  );
+
+  const activeGame = gameSlug && games
+    ? games.find((g) => slugify(g.name) === gameSlug)
+    : null;
 
   return (
     <>
