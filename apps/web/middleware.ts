@@ -24,6 +24,17 @@ const AUTH_COOKIE = "hg_access_token";
 // Routes that don't need an auth cookie
 const PUBLIC_PATHS = ["/login", "/register"];
 
+// Next.js metadata routes are fetched by the browser without auth.
+// If we protect them, tabs/home-screen icons fail to load.
+const PUBLIC_METADATA_PATHS = [
+  "/favicon.ico",
+  "/icon",
+  "/apple-icon",
+  "/manifest.webmanifest",
+  "/robots.txt",
+  "/sitemap.xml",
+];
+
 // Viewer route — accessible with a ?token= query param instead of a cookie
 const VIEWER_PATH_PREFIX = "/live";
 
@@ -32,6 +43,11 @@ export function middleware(request: NextRequest) {
 
   // 1. Always allow public auth pages
   if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
+    return NextResponse.next();
+  }
+
+  // 1.5 Always allow metadata/static SEO files
+  if (PUBLIC_METADATA_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
     return NextResponse.next();
   }
 
