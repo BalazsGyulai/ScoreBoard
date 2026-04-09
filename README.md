@@ -1,3 +1,5 @@
+NOTE: Not open-source yet, it's still under development...
+
 # Folder Sturcture
 ```
 homegame/
