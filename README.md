@@ -17,6 +17,24 @@ npm run test:run --workspace=apps/web
 npm run test:e2e --workspace=apps/web
 ```
 
+# Scoring and statistics
+
+One rule decides every place, win and loss — implemented in `apps/api/src/scoring.rs`
+(official result on close) and `apps/web/lib/scoring/standings.ts` (live screens), both
+tested against `packages/scoring/standings-cases.json`:
+
+1. Participants are players with at least one score (never scored = not ranked).
+2. More rounds played ranks first; with equal rounds the total decides (lowest wins for
+   "min" games, highest for "max"). A missing round is **not** 0 points.
+3. Equal rounds and equal total share the place (1, 1, 3); everyone on place 1 wins.
+4. The last place loses, only if there is more than one place.
+
+Statistics (`apps/web/lib/stats/`) are built from finished matches (`/stats/history`),
+dated by the match itself and counted in Europe/Budapest calendar years. The ranking
+needs a minimum number of matches (5, or fewer while nobody has 5) and orders by a win
+rate adjusted for sample size. Typed but unsaved scores are drafts (`score_drafts`) and
+never count anywhere.
+
 # Sessions
 
 Access tokens (JWT, `hg_access_token`) live `JWT_ACCESS_EXPIRY_MINUTES` (15). Refresh tokens

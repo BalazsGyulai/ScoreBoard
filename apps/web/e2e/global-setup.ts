@@ -53,7 +53,23 @@ export default async function globalSetup(config: FullConfig) {
       "add round",
     );
 
+  // Uno (min): three finished matches via close → restart cycles. Match 1 has a tie
+  // for first place and a player who skipped a round; the last one has 4 rounds.
   const closedGame = await createGame("Uno", "min");
+  const roundOf = async (gameId: string, scores: [number, number][]) =>
+    ok(
+      await ctx.post(`/api/games/${gameId}/scores`, {
+        data: { scores: scores.map(([i, value]) => ({ player_id: players[i].id, value })) },
+      }),
+      "add round",
+    );
+  await roundOf(closedGame, [[0, 3], [1, 3], [2, 9], [3, 7]]);
+  await roundOf(closedGame, [[0, 2], [1, 2], [2, 8]]); // player 3 skipped round 2
+  await ok(await ctx.post(`/api/games/${closedGame}/close`), "close game");
+  await ok(await ctx.post(`/api/games/${closedGame}/restart`), "restart game");
+  for (let r = 1; r <= 3; r++) await addRound(closedGame, r + 10);
+  await ok(await ctx.post(`/api/games/${closedGame}/close`), "close game");
+  await ok(await ctx.post(`/api/games/${closedGame}/restart`), "restart game");
   for (let r = 1; r <= 4; r++) await addRound(closedGame, r);
   await ok(await ctx.post(`/api/games/${closedGame}/close`), "close game");
 

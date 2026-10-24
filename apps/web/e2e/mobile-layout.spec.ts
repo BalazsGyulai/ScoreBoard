@@ -31,9 +31,9 @@ const appPages: PageCase[] = [
     name: "dashboard",
     path: () => "/dashboard",
     ready: async (page) => {
-      await expect(page.locator("table tbody tr")).toHaveCount(8);
+      await expect(page.getByTestId("leaderboard").getByRole("link").first()).toBeVisible();
+      await expect(page.getByText(/Vezet:/).first()).toBeVisible(); // open games in the recent list
     },
-    tables: 1,
   },
   {
     name: "games list",
@@ -55,6 +55,7 @@ const appPages: PageCase[] = [
     path: () => `/games/${s().closedGameSlug}`,
     ready: async (page) => {
       await expect(page.locator("table tbody tr")).toHaveCount(1 + 4);
+      await expect(page.getByRole("button", { name: "Előző" })).toBeEnabled(); // 3 archived matches
     },
     tables: 1,
   },
@@ -73,6 +74,17 @@ const appPages: PageCase[] = [
     },
     tables: 1,
   },
+  ...(["Játékok", "Párharcok", "Forma"] as const).map(
+    (tab): PageCase => ({
+      name: `stats – ${tab}`,
+      path: () => "/stats",
+      ready: async (page) => {
+        await page.getByRole("tab", { name: tab }).click();
+        await expect(page.getByRole("tab", { name: tab })).toHaveAttribute("aria-selected", "true");
+        await expect(page.locator("main section").first()).toBeVisible();
+      },
+    }),
+  ),
   {
     name: "player",
     path: () => `/players/${s().playerId}`,
@@ -92,9 +104,12 @@ const appPages: PageCase[] = [
     path: () => "/settings",
     ready: async (page) => {
       await expect(page.getByRole("heading", { name: "Beállítások" })).toBeVisible();
+      await expect(page.getByRole("button", { name: /Kijelentkezés/ })).toBeVisible();
     },
   },
 ];
+
+const pageCase = (name: string) => appPages.find((c) => c.name === name)!;
 
 const publicPages: PageCase[] = [
   {
@@ -157,9 +172,9 @@ test.describe("logged-in pages", () => {
 
   test("settings sidebar scrolls to the logout button", async ({ page }, testInfo) => {
     await page.goto(`/games/${s().openGameSlug}`);
-    await appPages[2].ready(page);
+    await pageCase("open game (score entry)").ready(page);
     await page.getByRole("button", { name: "Beállítások" }).click();
-    await expect(page.getByText("Megosztva")).toBeVisible();
+    await expect(page.getByText("Megosztva", { exact: true })).toBeVisible();
     const logout = page.getByRole("button", { name: /Kijelentkezés/ });
     await logout.scrollIntoViewIfNeeded();
     await expect(logout).toBeInViewport({ ratio: 1 });
@@ -169,8 +184,9 @@ test.describe("logged-in pages", () => {
 
   test("close-game confirmation fits and is tappable", async ({ page }, testInfo) => {
     await page.goto(`/games/${s().openGameSlug}`);
-    await appPages[2].ready(page);
+    await pageCase("open game (score entry)").ready(page);
     await page.getByRole("button", { name: "Meccs lezárása" }).click();
+    await expect(page.getByRole("dialog")).toContainText("Győztes");
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeInViewport({ ratio: 1 });
     await expectNoHorizontalOverflow(page);
@@ -181,7 +197,7 @@ test.describe("logged-in pages", () => {
 
   test("account modal fits and its save button is reachable", async ({ page }, testInfo) => {
     await page.goto(`/players/${s().playerId}`);
-    await appPages[6].ready(page);
+    await pageCase("player").ready(page);
     await page.getByRole("button", { name: "Fiók szerkesztése" }).click();
     const save = page.getByRole("button", { name: "Mentés" });
     await save.scrollIntoViewIfNeeded();
@@ -209,7 +225,7 @@ test.describe("logged-in pages", () => {
 
   test("a round can be entered on this screen", async ({ page }) => {
     await page.goto(`/games/${s().openGameSlug}`);
-    await appPages[2].ready(page);
+    await pageCase("open game (score entry)").ready(page);
     const inputs = page.locator("input[id^=inp_]");
     await expect(inputs).toHaveCount(8);
     // the last player's input sits off-screen on a phone: it must be reachable
