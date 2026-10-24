@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
+import StandingsList from "@/components/game/standingsList";
+import { computeStandings, joinNames } from "@/lib/scoring/standings";
 import styles from "./live.module.css";
 
 // ── Types matching the live state payload from Rust ──
@@ -150,30 +152,12 @@ export default function LiveViewerPage() {
     return Array.from(map.entries()).sort(([a], [b]) => a - b);
   }, [scores]);
 
-  // Totals per player
-  const totals = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const s of scores) {
-      map.set(s.user_id, (map.get(s.user_id) ?? 0) + s.value);
-    }
-    return map;
-  }, [scores]);
-
-  // Winner/loser detection
-  const { winnerId, loserId } = useMemo(() => {
-    if (!game || totals.size === 0) return { winnerId: null, loserId: null };
-    let best: { id: string; total: number } | null = null;
-    let worst: { id: string; total: number } | null = null;
-    for (const [id, total] of totals) {
-      if (!best || (game.winner_rule === "min" ? total < best.total : total > best.total)) {
-        best = { id, total };
-      }
-      if (!worst || (game.winner_rule === "min" ? total > worst.total : total < worst.total)) {
-        worst = { id, total };
-      }
-    }
-    return { winnerId: best?.id ?? null, loserId: worst?.id ?? null };
-  }, [game, totals]);
+  // Same ranking rule as the game screen and the official result (lib/scoring).
+  const standings = useMemo(
+    () => computeStandings(scores, game?.winner_rule === "min" ? "min" : "max"),
+    [scores, game?.winner_rule],
+  );
+  const winnerNames = standings.winners.map((id) => players.find((p) => p.id === id)?.username ?? "?");
 
   // ── Error states ──
 
@@ -215,6 +199,12 @@ export default function LiveViewerPage() {
               {" · "}
               {rounds.length} kör
             </div>
+            {winnerNames.length > 0 && (
+              <div className={styles["live-leader"]}>
+                🏆 {game.status === "closed" ? (winnerNames.length > 1 ? "Győztesek" : "Győztes") : winnerNames.length > 1 ? "Holtverseny" : "Vezet"}:{" "}
+                {joinNames(winnerNames)}
+              </div>
+            )}
             {game.status === "closed" && (
               <span className={styles["game-closed-badge"]}>Lezárt — végeredmény</span>
             )}
@@ -241,6 +231,18 @@ export default function LiveViewerPage() {
             : "Újracsatlakozás... (frissítés 5 mp-enként)"}
       </div>
 
+      {/* Standings: rank, total, gap to the leader */}
+      {game && (
+        <div className={styles["standings-wrap"]}>
+          <StandingsList
+            standings={standings}
+            rule={game.winner_rule === "min" ? "min" : "max"}
+            names={new Map(players.map((p) => [p.id, p.username]))}
+            final={game.status === "closed"}
+          />
+        </div>
+      )}
+
       {/* Score table */}
       {players.length === 0 ? (
         <p className={styles["empty-msg"]}>Még nincs pont rögzítve.</p>
@@ -260,16 +262,21 @@ export default function LiveViewerPage() {
               <tr className={styles["total-row"]}>
                 <td>Össz.</td>
                 {players.map((p) => {
-                  const t = totals.get(p.id) ?? 0;
-                  const cls =
-                    p.id === winnerId
-                      ? styles["winner-col"]
-                      : p.id === loserId
-                        ? styles["loser-col"]
-                        : "";
+                  const st = standings.byPlayer.get(p.id);
+                  const cls = standings.winners.includes(p.id)
+                    ? styles["winner-col"]
+                    : standings.losers.includes(p.id)
+                      ? styles["loser-col"]
+                      : "";
                   return (
                     <td key={p.id} className={cls}>
-                      {t}
+                      {st?.total ?? "—"}
+                      {st && (
+                        <span className={styles["place-note"]}>
+                          {st.place}. hely
+                          {st.roundsPlayed < standings.roundCount && ` · ${st.roundsPlayed}/${standings.roundCount}`}
+                        </span>
+                      )}
                     </td>
                   );
                 })}

@@ -9,15 +9,33 @@ import { usePathname } from "next/navigation";
 import { LogOut, X, Eye, Loader2, Plus, Copy, Check } from "lucide-react";
 import type { ApiGame, ApiPlayer, ApiScoreRow } from "@/types/api";
 import { readHiddenPlayerIds, writeHiddenPlayerIds } from "@/lib/playerVisibility";
+import { computeStandings, joinNames } from "@/lib/scoring/standings";
 import styles from "./sidebarSettings.module.css";
 
-type MeResponse = { role: string };
+type MeResponse = { user_id: string; username: string; role: string };
 
+/** The settings sheet opened from the navigation (gear button). */
 export default function SidebarSettins({
     onClose = () => { },
 }: {
     onClose?: React.MouseEventHandler<HTMLElement>;
 }) {
+    return (
+        <div className={`${styles["settings-overlay"]} ${styles.open}`}>
+            <div className={styles["settings-bd"]} onClick={onClose} />
+            <div className={styles["settings-panel"]} role="dialog" aria-modal="true" aria-label="Beállítások">
+                <button className={styles["settings-close"]} onClick={onClose} aria-label="Bezárás">
+                    <X size={13} />
+                </button>
+                <h2>Beállítások</h2>
+                <SettingsContent />
+            </div>
+        </div>
+    );
+}
+
+/** Settings sections — shared by the sheet and the /settings page. */
+export function SettingsContent() {
     const pathname = usePathname();
     const [visibility, setVisibility] = useState<Record<string, boolean>>({});
     const [isPending, startTransition] = useTransition();
@@ -87,40 +105,17 @@ export default function SidebarSettins({
     const orderedPlayers = (players ?? []).slice().sort((a, b) =>
         a.username.localeCompare(b.username, "hu"),
     );
-    const visiblePlayers = orderedPlayers.filter((p) => visibility[p.id] ?? true);
     const totalRounds = scoreRows ? new Set(scoreRows.map((s) => s.round)).size : 0;
 
+    // Same rule as the game screen and the official result (lib/scoring).
     const winnerPreview = useMemo(() => {
-        if (!activeGame || !scoreRows || scoreRows.length === 0 || visiblePlayers.length === 0) {
-            return "Még nincs pont";
-        }
-
-        const totals = new Map<string, number>();
-        for (const row of scoreRows) {
-            totals.set(row.user_id, (totals.get(row.user_id) ?? 0) + row.value);
-        }
-
-        const scoredVisiblePlayers = visiblePlayers
-            .map((player) => ({
-                username: player.username,
-                total: totals.get(player.id),
-            }))
-            .filter((player) => typeof player.total === "number") as { username: string; total: number }[];
-
-        if (scoredVisiblePlayers.length === 0) {
-            return "Még nincs pont";
-        }
-
-        const leader = scoredVisiblePlayers.reduce((best, current) => {
-            if (activeGame.winner_rule === "min") {
-                return current.total < best.total ? current : best;
-            }
-            return current.total > best.total ? current : best;
-        });
-
+        if (!activeGame || !scoreRows || scoreRows.length === 0) return "Még nincs pont";
+        const standings = computeStandings(scoreRows, activeGame.winner_rule);
+        const names = standings.winners.map((id) => players?.find((p) => p.id === id)?.username ?? "?");
+        const total = standings.rows[0]?.total;
         const ruleText = activeGame.winner_rule === "min" ? "minimum" : "maximum";
-        return `${leader.username} (${leader.total} pont, ${ruleText})`;
-    }, [activeGame, scoreRows, visiblePlayers]);
+        return `${joinNames(names)} (${total} pont, ${ruleText})`;
+    }, [activeGame, scoreRows, players]);
 
     const formattedCreatedAt = activeGame
         ? new Date(activeGame.created_at).toLocaleDateString("hu-HU")
@@ -184,12 +179,25 @@ export default function SidebarSettins({
         setShareLoading(false);
     }
 
-    function copyShareUrl() {
-        if (!shareData?.share_url) return;
+    async function copyShareUrl() {
+        if (!shareData?.share_url || !activeGame) return;
         const fullUrl = `${window.location.origin}${shareData.share_url}`;
-        navigator.clipboard.writeText(fullUrl);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+        // Phones: the native share sheet (Messenger, WhatsApp, ...); elsewhere: clipboard.
+        if (typeof navigator.share === "function") {
+            try {
+                await navigator.share({ title: `${activeGame.icon} ${activeGame.name} — élő eredmény`, url: fullUrl });
+                return;
+            } catch {
+                // cancelled or unsupported: fall back to copying
+            }
+        }
+        try {
+            await navigator.clipboard.writeText(fullUrl);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } catch {
+            setError("A linket nem sikerült másolni — jelöld ki és másold kézzel.");
+        }
     }
 
 
@@ -225,16 +233,19 @@ export default function SidebarSettins({
 
 
     return (
-        <div
-            className={`${styles["settings-overlay"]} ${styles.open}`}
-        >
-            <div className={styles["settings-bd"]} onClick={onClose} />
-            <div className={styles["settings-panel"]}>
-                <button className={styles["settings-close"]} onClick={onClose}>
-                    <X size={13} />
-                </button>
-                <h2>Beállítások</h2>
-
+        <>
+                {/* ── Account ── */}
+                {me && (
+                    <div className={styles["account-row"]}>
+                        <div className={styles["pt-name"]}>
+                            {me.username}
+                            <span className={styles["account-role"]}>{me.role === "leader" ? "Csoportvezető" : "Tag"}</span>
+                        </div>
+                        <Link href={`/players/${me.user_id}`} className={styles["account-link"]}>
+                            Profilom és fiókom
+                        </Link>
+                    </div>
+                )}
 
                 {/* ── Players ── */}
                 <div className={styles["s-section"]}>
@@ -251,6 +262,9 @@ export default function SidebarSettins({
                             </Link>
                         )}
                     </div>
+                    <p className={styles["s-hint"]}>
+                        Akit kikapcsolsz, nem kap oszlopot az új körökhöz ezen a készüléken. Aki már szerzett pontot, mindig látszik.
+                    </p>
                     {playersLoading ? (
                         <div className={styles["pt-row"]}>
                             <Loader2 size={14} className={styles.spinner} />
@@ -276,7 +290,9 @@ export default function SidebarSettins({
                             <div className={styles["pt-name"]}>{p.username}</div>
                             <button
                                 className={`${styles["pt-eye"]} ${visibility[p.id] ? styles.on : ""}`}
-                                title="Megjelenítés"
+                                title="Oszlop az új körökben"
+                                aria-label={`${p.username} megjelenítése a játékokban`}
+                                aria-pressed={!!visibility[p.id]}
                                 onClick={() => togglePlayer(p.id)}
                             >
                                 <Eye size={12} />
@@ -317,7 +333,7 @@ export default function SidebarSettins({
                 {/* ── Sharing ── */}
                 {activeGame && canAddPlayer && (
                     <div className={styles["share-section"]}>
-                        <div className={styles["s-label"]}>Megosztas</div>
+                        <div className={styles["s-label"]}>Élő megosztás</div>
                         <div className={styles["share-toggle-row"]}>
                             <span className={styles["share-toggle-label"]}>
                                 {shareData?.sharing && <span className={styles["share-dot"]} />}
@@ -327,7 +343,9 @@ export default function SidebarSettins({
                                 className={`${styles.toggle} ${shareData?.sharing ? styles.on : ""}`}
                                 onClick={toggleSharing}
                                 disabled={shareLoading}
-                                title={shareData?.sharing ? "Megosztas kikapcsolasa" : "Megosztas bekapcsolasa"}
+                                title={shareData?.sharing ? "Megosztás kikapcsolása" : "Megosztás bekapcsolása"}
+                                aria-label="Élő megosztás"
+                                aria-pressed={!!shareData?.sharing}
                             />
                         </div>
                         {shareData?.sharing && shareData.share_url && (
@@ -338,7 +356,8 @@ export default function SidebarSettins({
                                 <button
                                     className={`${styles["share-copy-btn"]} ${copied ? styles.copied : ""}`}
                                     onClick={copyShareUrl}
-                                    title="Link masolasa"
+                                    title="Link megosztása / másolása"
+                                    aria-label="Link megosztása"
                                 >
                                     {copied ? <Check size={12} /> : <Copy size={12} />}
                                 </button>
@@ -365,7 +384,6 @@ export default function SidebarSettins({
                         }
                     </button>
                 </div>
-            </div>
-        </div>
+        </>
     );
 }

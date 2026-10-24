@@ -2,40 +2,35 @@
 
 import { apiFetch, errorMessage, fetchJson } from "@/lib/api/client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { createPortal } from "react-dom";
-import {
-  ChevronLeft,
-  ChevronRight,
-  Check,
-  Plus,
-  PlusIcon,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, Check, Plus, PlusIcon, Undo2 } from "lucide-react";
 import ActionButton from "@/components/ui/actionButton";
-import Input from "@/components/ui/input";
+import StandingsList from "@/components/game/standingsList";
 import { useToast } from "@/components/toast/toastProvider";
 import styles from "./game.module.css";
 import { useParams } from "next/navigation";
 import useSWR, { mutate } from "swr";
-import { dashboardCacheKeys } from "@/lib/dashboard/cacheKeys";
-import { isPlayerVisible, readHiddenPlayerIds } from "@/lib/playerVisibility";
-import type {
-  AddRoundRequest,
-  ApiGame,
-  ApiPlayer,
-  ApiScoreRow,
-  ApiScoreSnapshot,
-  UpdateScoreRequest,
-} from "@/types/api";
+import { revalidateStats } from "@/lib/dashboard/cacheKeys";
+import { HIDDEN_PLAYERS_CHANGED_EVENT, isPlayerVisible, readHiddenPlayerIds } from "@/lib/playerVisibility";
+import { computeStandings, joinNames } from "@/lib/scoring/standings";
+import { useScoreDrafts, type DraftStatus } from "@/hooks/use-score-drafts";
+import type { AddRoundRequest, ApiGame, ApiPlayer, ApiScoreRow, ApiScoreSnapshot } from "@/types/api";
 
 type MeResponse = { role: string };
-type PendingAction = "close" | "restart" | null;
+type PendingAction =
+  | { kind: "close" }
+  | { kind: "restart" }
+  | { kind: "undo" }
+  | { kind: "partial"; missing: string[]; scores: AddRoundRequest["scores"] }
+  | null;
+
+const swrOptions = { revalidateOnFocus: false, revalidateOnReconnect: false, revalidateIfStale: false };
 
 function slugify(name: string) {
   return name.trim().toLowerCase();
 }
-
 
 function buildScoreMap(scores: ApiScoreRow[]) {
   const scoreMap = new Map<number, Map<string, ApiScoreRow>>();
@@ -44,6 +39,12 @@ function buildScoreMap(scores: ApiScoreRow[]) {
     scoreMap.get(s.round)!.set(s.user_id, s);
   }
   return scoreMap;
+}
+
+function parseScore(raw: string): number | null {
+  if (raw.trim() === "") return null;
+  const n = Number(raw);
+  return Number.isInteger(n) ? n : null;
 }
 
 export default function ActiveGamePage() {
@@ -56,43 +57,25 @@ export default function ActiveGamePage() {
   const [snapshotIndex, setSnapshotIndex] = useState(0);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const [isSubmittingAction, setIsSubmittingAction] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [isClient, setIsClient] = useState(false);
 
   // Use the cached games list to resolve slug -> game id.
-  const { data: games } = useSWR<ApiGame[]>("/api/games", fetchJson, {
-    revalidateOnFocus: false,
-    revalidateOnReconnect: false,
-    revalidateIfStale: false,
-  });
+  const { data: games } = useSWR<ApiGame[]>("/api/games", fetchJson, swrOptions);
   const game = games?.find((g) => slugify(g.name) === slugify(slug));
+  const isOpen = game?.status === "open";
 
-  const {
-    data: me,
-  } = useSWR<MeResponse>("/api/auth/me", fetchJson, {
-    revalidateOnFocus: false,
-    revalidateOnReconnect: false,
-    revalidateIfStale: false,
-  });
-  const {
-    data: players,
-    isLoading: playersLoading,
-    error: playersError,
-  } = useSWR<ApiPlayer[]>("/api/players", fetchJson, {
-    revalidateOnFocus: false,
-    revalidateOnReconnect: false,
-    revalidateIfStale: false,
-  });
+  const { data: me } = useSWR<MeResponse>("/api/auth/me", fetchJson, swrOptions);
+  const { data: players, isLoading: playersLoading, error: playersError } = useSWR<ApiPlayer[]>(
+    "/api/players",
+    fetchJson,
+    swrOptions,
+  );
 
-  const {
-    data: scoreSnapshots,
-  } = useSWR<ApiScoreSnapshot[]>(
+  const { data: scoreSnapshots } = useSWR<ApiScoreSnapshot[]>(
     game?.status === "closed" ? `/api/games/${game.id}/score-snapshots` : null,
     fetchJson,
-    {
-      revalidateOnFocus: false,
-      revalidateOnReconnect: false,
-      revalidateIfStale: false,
-    },
+    swrOptions,
   );
 
   const selectedSnapshotId =
@@ -100,36 +83,28 @@ export default function ActiveGamePage() {
       ? scoreSnapshots[Math.min(snapshotIndex, scoreSnapshots.length - 1)]?.snapshot_id ?? null
       : null;
 
-  const {
-    data: scoreRows,
-    isLoading: scoresLoading,
-    error: scoresError,
-  } = useSWR<ApiScoreRow[]>(
-    game
-      ? game.status === "closed" && selectedSnapshotId
-        ? `/api/games/${game.id}/scores?snapshot_id=${encodeURIComponent(selectedSnapshotId)}`
-        : `/api/games/${game.id}/scores`
-      : null,
+  const scoresKey = game
+    ? game.status === "closed" && selectedSnapshotId
+      ? `/api/games/${game.id}/scores?snapshot_id=${encodeURIComponent(selectedSnapshotId)}`
+      : `/api/games/${game.id}/scores`
+    : null;
+
+  const { data: scoreRows, isLoading: scoresLoading, error: scoresError } = useSWR<ApiScoreRow[]>(
+    scoresKey,
     fetchJson,
     {
-      revalidateOnFocus: false,
-      revalidateOnReconnect: false,
-      revalidateIfStale: false,
+      ...swrOptions,
+      // several phones at the table: pick up rounds saved on another device
+      refreshInterval: isOpen && !editingCell ? 15_000 : 0,
     },
   );
 
   useEffect(() => {
-    const syncHiddenPlayers = () => {
-      setHiddenPlayerIds(readHiddenPlayerIds());
-    };
-
+    const syncHiddenPlayers = () => setHiddenPlayerIds(readHiddenPlayerIds());
     syncHiddenPlayers();
-    window.addEventListener("storage", syncHiddenPlayers);
-    window.addEventListener("focus", syncHiddenPlayers);
-    return () => {
-      window.removeEventListener("storage", syncHiddenPlayers);
-      window.removeEventListener("focus", syncHiddenPlayers);
-    };
+    const events = ["storage", "focus", HIDDEN_PLAYERS_CHANGED_EVENT];
+    events.forEach((e) => window.addEventListener(e, syncHiddenPlayers));
+    return () => events.forEach((e) => window.removeEventListener(e, syncHiddenPlayers));
   }, []);
 
   useEffect(() => {
@@ -137,225 +112,201 @@ export default function ActiveGamePage() {
   }, []);
 
   useEffect(() => {
-    if (game?.status !== "closed") {
-      setSnapshotIndex(0);
-      return;
-    }
-    if (!scoreSnapshots || scoreSnapshots.length === 0) {
+    if (game?.status !== "closed" || !scoreSnapshots || scoreSnapshots.length === 0) {
       setSnapshotIndex(0);
       return;
     }
     setSnapshotIndex((prev) => Math.min(prev, scoreSnapshots.length - 1));
   }, [game?.id, game?.status, scoreSnapshots]);
 
-  const orderedPlayers = (players ?? [])
-    .filter((player) => isPlayerVisible(player.id, hiddenPlayerIds))
-    .slice()
-    .sort((a, b) =>
-    a.username.localeCompare(b.username, "hu"),
+  const rows = useMemo(() => scoreRows ?? [], [scoreRows]);
+  const standings = useMemo(
+    () => computeStandings(rows, game?.winner_rule ?? "max"),
+    [rows, game?.winner_rule],
   );
 
-  const scoreMap = scoreRows ? buildScoreMap(scoreRows) : new Map<number, Map<string, ApiScoreRow>>();
-  const roundNumbers = scoreRows
-    ? [...new Set(scoreRows.map((s) => s.round))].sort((a, b) => a - b)
-    : [];
-  const rounds = roundNumbers.map((r) =>
-    orderedPlayers.map((p) => scoreMap.get(r)?.get(p.id)?.value ?? null),
-  );
+  // Columns: everyone who has scores in this session (hiding never hides a result),
+  // plus the visible players who can still join an open game.
+  const columns = useMemo(() => {
+    const scored = new Set(rows.map((r) => r.user_id));
+    return (players ?? [])
+      .filter((p) => scored.has(p.id) || (isOpen && isPlayerVisible(p.id, hiddenPlayerIds)))
+      .sort((a, b) => a.username.localeCompare(b.username, "hu"));
+  }, [players, rows, isOpen, hiddenPlayerIds]);
+  const nameOf = (id: string) => players?.find((p) => p.id === id)?.username ?? "?";
 
-  const totals = orderedPlayers.map((_, pi) =>
-    rounds.reduce((s, r) => s + (r[pi] ?? 0), 0),
-  );
-
-  const hasScores = roundNumbers.length > 0;
-
-  const scoredTotals = totals
-    .map((t, idx) => ({ t, idx }));
-
-  const hasVisibleScoredPlayers = scoredTotals.length > 0;
-
-  const leaderIdx =
-    !game || !hasScores || !hasVisibleScoredPlayers
-      ? null
-      : scoredTotals.reduce((a, b) => {
-        if (game.winner_rule === "min") return a.t <= b.t ? a : b;
-        return a.t >= b.t ? a : b;
-      }).idx;
-
-  const leaderName = leaderIdx === null ? null : orderedPlayers[leaderIdx]?.username ?? null;
-  const leaderTotal = leaderIdx === null ? null : totals[leaderIdx] ?? null;
-
-  const bestTotal =
-    !game || !hasScores || !hasVisibleScoredPlayers
-      ? null
-      : (game.winner_rule === "min"
-        ? Math.min(...scoredTotals.map((x) => x.t))
-        : Math.max(...scoredTotals.map((x) => x.t)));
-  const worstTotal =
-    !game || !hasScores || !hasVisibleScoredPlayers
-      ? null
-      : (game.winner_rule === "min"
-        ? Math.max(...scoredTotals.map((x) => x.t))
-        : Math.min(...scoredTotals.map((x) => x.t)));
+  const scoreMap = buildScoreMap(rows);
+  const roundNumbers = [...new Set(rows.map((s) => s.round))].sort((a, b) => a - b);
+  const winners = standings.winners.map(nameOf);
+  const winnerTotal = standings.rows[0]?.total ?? null;
+  const incompleteCount = standings.rows.filter((r) => r.roundsPlayed < standings.roundCount).length;
   const canManageGame = me?.role === "leader";
+  const canEdit = canManageGame && isOpen;
 
-  async function commitRound() {
+  async function refreshAfterChange() {
     if (!game) return;
-    if (!canManageGame) return;
-    if (!orderedPlayers.length) return;
+    await mutate(`/api/games/${game.id}/scores`);
+    void mutate("/api/games");
+  }
+
+  // Typed numbers are autosaved as drafts (not scores) until the round is submitted.
+  const drafts = useScoreDrafts(game?.id ?? null, canEdit, () => {
+    showToast("Ezt a kört egy másik eszközön már elmentették.", "info");
+    void refreshAfterChange();
+  });
+
+  function inputFor(playerId: string) {
+    return document.getElementById(`inp_${playerId}`) as HTMLInputElement | null;
+  }
+
+  function clearInputRow() {
+    drafts.clearAll(columns.map((p) => p.id));
+  }
+
+  function commitRound() {
+    if (!game || !canEdit || isSaving) return;
 
     const scores: AddRoundRequest["scores"] = [];
-
-    for (let i = 0; i < orderedPlayers.length; i++) {
-      const p = orderedPlayers[i];
-      const el = document.getElementById(`inp_${p.id}`) as HTMLInputElement | null;
-      const v = el ? parseInt(el.value) : NaN;
-      if (!isNaN(v)) {
-        scores.push({ player_id: p.id, value: v });
+    const missing: string[] = [];
+    for (const p of columns) {
+      const raw = drafts.entries[p.id] ?? "";
+      const value = parseScore(raw);
+      if (raw.trim() !== "" && value === null) {
+        showToast(`${p.username}: csak egész szám adható meg.`);
+        inputFor(p.id)?.focus();
+        return;
       }
+      if (value === null) missing.push(p.username);
+      else scores.push({ player_id: p.id, value });
     }
 
     if (scores.length === 0) {
       showToast("Adj meg legalább egy pontszámot!");
       return;
     }
-
-    const res = await apiFetch(`/api/games/${game.id}/scores`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ scores } satisfies AddRoundRequest),
-    });
-
-    if (!res.ok) {
-      const message = await errorMessage(res);
-      showToast(message);
+    // A missing score is "did not play this round", not 0 points — confirm it.
+    if (missing.length > 0) {
+      setPendingAction({ kind: "partial", missing, scores });
       return;
     }
+    void saveRound(scores);
+  }
 
-    // Clear inputs
-    for (const p of orderedPlayers) {
-      const el = document.getElementById(`inp_${p.id}`) as HTMLInputElement | null;
-      if (el) el.value = "";
+  async function saveRound(scores: AddRoundRequest["scores"]) {
+    if (!game) return;
+    setIsSaving(true);
+    try {
+      const res = await apiFetch(`/api/games/${game.id}/scores`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scores } satisfies AddRoundRequest),
+      });
+      if (!res.ok) {
+        showToast(await errorMessage(res));
+        return;
+      }
+      await drafts.resetAfterSubmit();
+      await refreshAfterChange();
+      if (columns[0]) inputFor(columns[0].id)?.focus({ preventScroll: true });
+    } finally {
+      setIsSaving(false);
     }
-
-    // Refresh scores (and the cached games list, since current_round advances)
-    await mutate(`/api/games/${game.id}/scores`);
-    void mutate("/api/games");
   }
 
   function startEdit(round: number, userId: string) {
-    if (!canManageGame) return;
-    if (game?.status === "closed") return;
+    if (!canEdit) return;
     setEditingCell({ round, userId });
     setTimeout(() => editRef.current?.select(), 0);
   }
 
-  async function saveEdit(scoreId: string, prevValue: number) {
-    if (!canManageGame) return;
+  async function saveEdit(round: number, userId: string, prevValue: number | null) {
     const raw = editRef.current?.value ?? "";
-    const nextValue = parseInt(raw, 10);
-    if (Number.isNaN(nextValue)) {
+    const nextValue = parseScore(raw);
+    if (!game || nextValue === null || nextValue === prevValue) {
       setEditingCell(null);
       return;
     }
 
-    if (nextValue === prevValue) {
-      setEditingCell(null);
-      return;
-    }
-
-    const res = await apiFetch(`/api/scores/${scoreId}`, {
+    const res = await apiFetch(`/api/games/${game.id}/scores/${round}/${userId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ value: nextValue } satisfies UpdateScoreRequest),
+      body: JSON.stringify({ value: nextValue }),
     });
-
-    if (!res.ok) {
-      const message = await errorMessage(res);
-      showToast(message);
-      setEditingCell(null);
-      return;
-    }
-
     setEditingCell(null);
-    if (game) {
+    if (!res.ok) {
+      showToast(await errorMessage(res));
+      return;
+    }
+    await refreshAfterChange();
+  }
+
+  async function runAction(path: string, method: "POST" | "DELETE", okMessage?: string) {
+    if (!game || !canManageGame) return;
+    setIsSubmittingAction(true);
+    try {
+      const res = await apiFetch(path, { method, headers: { "Content-Type": "application/json" } });
+      if (!res.ok) {
+        showToast(await errorMessage(res));
+        return;
+      }
+      await mutate("/api/games");
+      await mutate(`/api/games/${game.id}/score-snapshots`);
       await mutate(`/api/games/${game.id}/scores`);
-    }
-  }
-
-  function clearInputRow() {
-    for (const p of orderedPlayers) {
-      const el = document.getElementById(`inp_${p.id}`) as HTMLInputElement | null;
-      if (el) el.value = "";
-    }
-  }
-
-  async function finishGame() {
-    if (!game) return;
-    if (!canManageGame) return;
-    setIsSubmittingAction(true);
-
-    const res = await apiFetch(`/api/games/${game.id}/close`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-    });
-
-    if (!res.ok) {
-      const message = await errorMessage(res);
-      showToast(message);
+      await revalidateStats();
+      if (okMessage) showToast(okMessage, "success");
+      setPendingAction(null);
+    } finally {
       setIsSubmittingAction(false);
-      return;
     }
-
-    // Refresh game data (status will now be 'closed') and related caches
-    await mutate("/api/games");
-    await mutate(`/api/games/${game.id}/score-snapshots`);
-    await mutate(`/api/games/${game.id}/scores`);
-    await mutate("/api/stats");
-    await Promise.all(dashboardCacheKeys.map((key) => mutate(key)));
-    setIsSubmittingAction(false);
-    setPendingAction(null);
-  }
-
-  async function restartGame() {
-    if (!game) return;
-    if (!canManageGame) return;
-    setIsSubmittingAction(true);
-
-    const res = await apiFetch(`/api/games/${game.id}/restart`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-    });
-
-    if (!res.ok) {
-      const message = await errorMessage(res);
-      showToast(message);
-      setIsSubmittingAction(false);
-      return;
-    }
-
-    // Refresh everything — game is open again with no scores
-    await mutate("/api/games");
-    await mutate(`/api/games/${game.id}/score-snapshots`);
-    if (game) await mutate(`/api/games/${game.id}/scores`);
-    await Promise.all(dashboardCacheKeys.map((key) => mutate(key)));
-    setIsSubmittingAction(false);
-    setPendingAction(null);
   }
 
   async function confirmPendingAction() {
-    if (pendingAction === "close") {
-      await finishGame();
-      return;
-    }
-    if (pendingAction === "restart") {
-      await restartGame();
+    if (!game || !pendingAction) return;
+    switch (pendingAction.kind) {
+      case "close":
+        return runAction(`/api/games/${game.id}/close`, "POST");
+      case "restart":
+        return runAction(`/api/games/${game.id}/restart`, "POST");
+      case "undo":
+        return runAction(`/api/games/${game.id}/rounds/last`, "DELETE", "Az utolsó kör törölve.");
+      case "partial":
+        setPendingAction(null);
+        return saveRound(pendingAction.scores);
     }
   }
+
+  const dialog = pendingAction && {
+    close: {
+      title: "Meccs lezárása",
+      body:
+        winners.length > 0
+          ? `${winners.length > 1 ? "Holtverseny — győztesek" : "Győztes"}: ${joinNames(winners)} (${winnerTotal} pont). Lezárod a meccset?`
+          : "Biztosan le akarod zárni a meccset?",
+      confirm: "Lezárás",
+      variant: "amber" as const,
+    },
+    restart: {
+      title: "Új játék indítása",
+      body: "Új játékot indítasz – a korábbi eredmények megmaradnak. Folytatod?",
+      confirm: "Új játék",
+      variant: "dark" as const,
+    },
+    undo: {
+      title: "Utolsó kör törlése",
+      body: `A(z) ${roundNumbers.at(-1)}. kör összes pontja törlődik. Folytatod?`,
+      confirm: "Törlés",
+      variant: "danger" as const,
+    },
+    partial: {
+      title: "Hiányzó pontok",
+      body:
+        pendingAction.kind === "partial"
+          ? `${joinNames(pendingAction.missing)} nem kap pontot ebben a körben. Ez nem 0 pont: aki kevesebb kört játszik, a sorrendben hátrébb kerül. A hiányzó pont később pótolható.`
+          : "",
+      confirm: "Mentés így",
+      variant: "dark" as const,
+    },
+  }[pendingAction.kind];
 
   return (
     <div className="view">
@@ -365,16 +316,7 @@ export default function ActiveGamePage() {
           <Link href="/games" className={styles.back}>
             ← Vissza a játékokhoz
           </Link>
-          <h1>
-            {game ? (
-              <>
-                {game.icon} {game.name}{" "}
-                <span className={styles.orange}>#{game.current_round}</span>
-              </>
-            ) : (
-              "Játék betöltése..."
-            )}
-          </h1>
+          <h1>{game ? `${game.icon} ${game.name}` : games ? "Nincs ilyen játék" : "Játék betöltése..."}</h1>
           <div className={styles["game-pg-sub"]}>
             {playersLoading || scoresLoading ? (
               "Betöltés..."
@@ -386,47 +328,43 @@ export default function ActiveGamePage() {
               "Nincs ilyen játék ebben a csoportban."
             ) : (
               <>
-                {orderedPlayers.length} játékos · {game?.status === "closed" ? "Lezárva" : "Folyamatban"} &nbsp;·&nbsp;{" "}
-                {game?.status === "closed" && scoreSnapshots && scoreSnapshots.length > 0 && (
-                  <>
-                    Archívum: {snapshotIndex + 1}/{scoreSnapshots.length} &nbsp;·&nbsp;{" "}
-                  </>
-                )}
-                {leaderName && leaderTotal !== null ? (
-                  <span className={styles.orange} style={{ fontWeight: 500 }}>
-                    🏆 Vezet: {leaderName} ({leaderTotal} pont)
-                  </span>
-                ) : (
-                  <span style={{ color: "var(--slate-500)" }}>
-                    Még nincs pont rögzítve
-                  </span>
-                )}
+                <span>
+                  {game.winner_rule === "min" ? "Kevesebb pont nyer" : "Több pont nyer"} ·{" "}
+                  {isOpen ? `Következik: ${roundNumbers.length + 1}. kör` : `Lezárva · ${roundNumbers.length} kör`}
+                  {game.status === "closed" && scoreSnapshots && scoreSnapshots.length > 1 && (
+                    <> · Archívum {snapshotIndex + 1}/{scoreSnapshots.length}</>
+                  )}
+                </span>
+                <span className={styles["leader-line"]} data-testid="leader-line">
+                  {winners.length > 0 ? (
+                    <span className={styles.orange}>
+                      🏆 {isOpen ? (winners.length > 1 ? "Holtverseny" : "Vezet") : winners.length > 1 ? "Győztesek" : "Győztes"}:{" "}
+                      {joinNames(winners)} ({winnerTotal} pont)
+                    </span>
+                  ) : (
+                    <span>Még nincs pont rögzítve</span>
+                  )}
+                </span>
               </>
             )}
           </div>
         </div>
         <div className={styles["game-actions"]}>
-          {/* <ActionButton
-            text="Töröl"
-            variant="danger"
-            icon={<Trash2 size={13} />}
-          /> */}
-
-          {canManageGame && game?.status === "closed" && (
+          {game?.status === "closed" && scoreSnapshots && scoreSnapshots.length > 1 && (
             <>
               <ActionButton
                 text="Előző"
                 variant="ghost"
                 icon={<ChevronLeft size={13} />}
                 onClick={() => setSnapshotIndex((prev) => prev + 1)}
-                disabled={!scoreSnapshots || snapshotIndex >= scoreSnapshots.length - 1}
+                disabled={snapshotIndex >= scoreSnapshots.length - 1}
               />
               <ActionButton
                 text="Következő"
                 variant="ghost"
                 icon={<ChevronRight size={13} />}
                 onClick={() => setSnapshotIndex((prev) => Math.max(0, prev - 1))}
-                disabled={!scoreSnapshots || snapshotIndex <= 0}
+                disabled={snapshotIndex <= 0}
               />
             </>
           )}
@@ -435,15 +373,16 @@ export default function ActiveGamePage() {
               text="Új játék"
               variant="ghost"
               icon={<PlusIcon size={13} />}
-              onClick={() => setPendingAction("restart")}
+              onClick={() => setPendingAction({ kind: "restart" })}
             />
           )}
-          {canManageGame && game?.status !== "closed" && (
+          {canEdit && (
             <ActionButton
               text="Meccs lezárása"
               variant="amber"
               icon={<Check size={13} />}
-              onClick={() => setPendingAction("close")}
+              onClick={() => setPendingAction({ kind: "close" })}
+              disabled={roundNumbers.length === 0}
             />
           )}
         </div>
@@ -458,11 +397,8 @@ export default function ActiveGamePage() {
             <thead>
               <tr>
                 <th className={styles["col-round"]}>Kör</th>
-                {orderedPlayers.map((p) => (
-                  <th key={p.id}>
-                    <span className={styles.pid}></span>
-                    {p.username}
-                  </th>
+                {columns.map((p) => (
+                  <th key={p.id}>{p.username}</th>
                 ))}
               </tr>
             </thead>
@@ -470,38 +406,58 @@ export default function ActiveGamePage() {
               {/* Total row */}
               <tr className={styles["total-row"]}>
                 <td>Összesen</td>
-                {totals.map((t, i) => {
-                  const isWinner =
-                    bestTotal !== null && t === bestTotal && bestTotal !== worstTotal;
-                  const isLoser =
-                    worstTotal !== null && t === worstTotal && bestTotal !== worstTotal;
-                  const cls = isWinner
-                    ? styles["winner-col"]
-                    : isLoser
-                      ? styles["loser-col"]
-                      : "";
+                {columns.map((p) => {
+                  const s = standings.byPlayer.get(p.id);
+                  if (!s) {
+                    return (
+                      <td key={p.id} className={styles.muted}>
+                        —
+                      </td>
+                    );
+                  }
+                  const isWinner = standings.winners.includes(p.id);
+                  const isLoser = standings.losers.includes(p.id);
+                  const incomplete = s.roundsPlayed < standings.roundCount;
                   return (
-                    <td key={i} className={cls}>
-                      {t}
+                    <td
+                      key={p.id}
+                      className={isWinner ? styles["winner-col"] : isLoser ? styles["loser-col"] : ""}
+                      data-place={s.place}
+                    >
+                      {s.total}
                       {isWinner ? " 🏆" : ""}
+                      <span className={styles["place-note"]}>
+                        {s.place}. hely
+                        {incomplete && ` · ${s.roundsPlayed}/${standings.roundCount} kör`}
+                      </span>
                     </td>
                   );
                 })}
               </tr>
 
               {/* Input row — only for open games */}
-              {canManageGame && game?.status !== "closed" && (
+              {canEdit && (
                 <tr className={styles["input-row"]}>
                   <td>Új kör</td>
-                  {orderedPlayers.map((p) => (
+                  {columns.map((p, i) => (
                     <td key={p.id}>
-                      <Input
-                        naked
+                      <input
                         className={styles["round-inp"]}
                         type="number"
+                        step={1}
                         id={`inp_${p.id}`}
                         placeholder="—"
-                        min={0}
+                        value={drafts.entries[p.id] ?? ""}
+                        onChange={(e) => drafts.setEntry(p.id, e.target.value)}
+                        aria-label={`${p.username} pontja`}
+                        enterKeyHint={i === columns.length - 1 ? "done" : "next"}
+                        onKeyDown={(e) => {
+                          if (e.key !== "Enter") return;
+                          e.preventDefault();
+                          const next = columns[i + 1];
+                          if (next) inputFor(next.id)?.focus();
+                          else commitRound();
+                        }}
                       />
                     </td>
                   ))}
@@ -512,49 +468,54 @@ export default function ActiveGamePage() {
               {roundNumbers.map((roundNo) => (
                 <tr key={roundNo}>
                   <td>{roundNo}. kör</td>
-                  {orderedPlayers.map((p) => {
+                  {columns.map((p) => {
                     const score = scoreMap.get(roundNo)?.get(p.id);
-                    const isEditing =
-                      editingCell?.round === roundNo && editingCell?.userId === p.id;
-                    const val = score?.value ?? null;
+                    const isEditing = editingCell?.round === roundNo && editingCell?.userId === p.id;
 
+                    if (isEditing) {
+                      return (
+                        <td key={p.id}>
+                          <input
+                            ref={editRef}
+                            className={styles["cell-edit"]}
+                            type="number"
+                            aria-label={`${p.username}, ${roundNo}. kör`}
+                            defaultValue={score?.value ?? ""}
+                            onBlur={() => void saveEdit(roundNo, p.id, score?.value ?? null)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") e.currentTarget.blur();
+                              if (e.key === "Escape") setEditingCell(null);
+                            }}
+                            autoFocus
+                          />
+                        </td>
+                      );
+                    }
+                    if (canEdit) {
+                      return (
+                        <td key={p.id}>
+                          <button
+                            type="button"
+                            className={`${styles["cell-val"]} ${styles["cell-btn"]} ${score ? "" : styles["cell-missing"]}`}
+                            onClick={() => startEdit(roundNo, p.id)}
+                            title={score ? "Szerkesztés" : "Hiányzó pont pótlása"}
+                            aria-label={
+                              score
+                                ? `${p.username}, ${roundNo}. kör: ${score.value} — szerkesztés`
+                                : `${p.username}, ${roundNo}. kör: hiányzik — pótlás`
+                            }
+                          >
+                            {score ? score.value : "—"}
+                          </button>
+                        </td>
+                      );
+                    }
                     return (
                       <td key={p.id}>
                         {score ? (
-                          isEditing ? (
-                            <Input
-                              id={`edit_${score.id}`}
-                              naked
-                              inputRef={editRef}
-                              className={styles["cell-edit"]}
-                              type="number"
-                              defaultValue={score.value}
-                              onBlur={() => void saveEdit(score.id, score.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  (e.currentTarget as HTMLInputElement).blur();
-                                }
-                                if (e.key === "Escape") setEditingCell(null);
-                              }}
-                              autoFocus
-                            />
-                          ) : canManageGame && game?.status !== "closed" ? (
-                            <button
-                              type="button"
-                              className={`${styles["cell-val"]} ${styles["cell-btn"]}`}
-                              onClick={() => startEdit(roundNo, p.id)}
-                              title="Szerkesztés"
-                              aria-label={`${p.username}, ${roundNo}. kör: ${score.value} — szerkesztés`}
-                            >
-                              {score.value}
-                            </button>
-                          ) : (
-                            <span className={styles["cell-val"]}>{score.value}</span>
-                          )
-                        ) : val === null ? (
-                          <span style={{ color: "var(--slate-200)" }}>—</span>
+                          <span className={styles["cell-val"]}>{score.value}</span>
                         ) : (
-                          <span className={styles["cell-val"]}>{val}</span>
+                          <span className={styles.muted}>—</span>
                         )}
                       </td>
                     );
@@ -565,32 +526,48 @@ export default function ActiveGamePage() {
           </table>
         </div>
 
-          {/* Footer */}
-          <div className={styles["tbl-foot"]}>
-            <span className={styles["tbl-foot-info"]}>
-              <strong>{rounds.length}</strong> kör lejátszva
-            </span>
-            <div className={styles["tbl-foot-actions"]}>
-              {canManageGame && game?.status !== "closed" && (
-                <>
+        {/* Footer */}
+        <div className={styles["tbl-foot"]}>
+          <span className={styles["tbl-foot-info"]}>
+            <strong>{roundNumbers.length}</strong> kör lejátszva
+            {incompleteCount > 0 && <> · {incompleteCount} játékosnál hiányzik pont</>}
+            {canEdit && <DraftIndicator status={drafts.status} />}
+          </span>
+          <div className={styles["tbl-foot-actions"]}>
+            {canEdit && (
+              <>
+                {roundNumbers.length > 0 && (
                   <ActionButton
-                    text="Mégse"
+                    text="Utolsó kör"
                     variant="ghost"
-                    onClick={clearInputRow}
+                    icon={<Undo2 size={13} />}
+                    onClick={() => setPendingAction({ kind: "undo" })}
                   />
-                  <ActionButton
-                    text="Kör mentése"
-                    variant="dark"
-                    icon={<Plus size={13} />}
-                    onClick={commitRound}
-                  />
-                </>
-              )}
-            </div>
+                )}
+                <ActionButton text="Ürít" variant="ghost" onClick={clearInputRow} />
+                <ActionButton
+                  text={isSaving ? "Mentés..." : "Kör mentése"}
+                  variant="dark"
+                  icon={<Plus size={13} />}
+                  onClick={commitRound}
+                  disabled={isSaving}
+                />
+              </>
+            )}
           </div>
+        </div>
       </div>
 
-      {isClient && pendingAction && createPortal((
+      {game && (
+        <StandingsList
+          standings={standings}
+          rule={game.winner_rule}
+          names={new Map((players ?? []).map((p) => [p.id, p.username]))}
+          final={!isOpen}
+        />
+      )}
+
+      {isClient && pendingAction && dialog && createPortal((
         <div
           className={styles["confirm-overlay"]}
           onClick={() => {
@@ -604,14 +581,8 @@ export default function ActiveGamePage() {
             aria-labelledby="confirm-modal-title"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 id="confirm-modal-title">
-              {pendingAction === "close" ? "Meccs lezárása" : "Új játék indítása"}
-            </h3>
-            <p>
-              {pendingAction === "close"
-                ? "Biztosan le akarod zárni a meccset?"
-                : "Új játékot indítasz - a korábbi eredmények megmaradnak. Folytatod?"}
-            </p>
+            <h3 id="confirm-modal-title">{dialog.title}</h3>
+            <p>{dialog.body}</p>
             <div className={styles["confirm-actions"]}>
               <ActionButton
                 text="Mégse"
@@ -620,8 +591,8 @@ export default function ActiveGamePage() {
                 disabled={isSubmittingAction}
               />
               <ActionButton
-                text={pendingAction === "close" ? "Lezárás" : "Új játék"}
-                variant={pendingAction === "close" ? "amber" : "dark"}
+                text={dialog.confirm}
+                variant={dialog.variant}
                 onClick={() => void confirmPendingAction()}
                 disabled={isSubmittingAction}
               />
@@ -630,5 +601,22 @@ export default function ActiveGamePage() {
         </div>
       ), document.body)}
     </div>
+  );
+}
+
+const draftText: Partial<Record<DraftStatus, string>> = {
+  saving: "Vázlat mentése…",
+  saved: "Vázlat mentve ✓",
+  error: "A vázlatot nem sikerült menteni",
+};
+
+/** Where the typed (not yet submitted) numbers are. */
+function DraftIndicator({ status }: { status: DraftStatus }) {
+  const text = draftText[status];
+  if (!text) return null;
+  return (
+    <span className={`${styles["draft-status"]} ${status === "error" ? styles["draft-error"] : ""}`} role="status" data-testid="draft-status">
+      {text}
+    </span>
   );
 }

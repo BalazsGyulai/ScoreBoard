@@ -30,6 +30,34 @@
   font-size: 13px;
   color: var(--slate-500);
   margin-top: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.leader-line {
+  font-weight: 500;
+}
+
+.muted {
+  color: var(--slate-300);
+}
+
+/* place (and missing rounds) under each total */
+.place-note {
+  display: block;
+  margin-top: 2px;
+  font-family: "DM Sans", sans-serif;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--slate-500);
+}
+
+/* a round without a score for this player: tap to fill in */
+.cell-missing {
+  color: var(--orange-dk);
+  border: 1.5px dashed rgba(245, 158, 11, 0.45);
 }
 
 .game-actions {
@@ -402,4 +430,15 @@ tr:hover .del-btn {
     flex: 1;
     justify-content: center;
   }
+}
+
+.draft-status {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--slate-500);
+}
+
+.draft-error {
+  color: var(--danger);
 }
