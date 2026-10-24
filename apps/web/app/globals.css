@@ -23,6 +23,8 @@
    --ease: cubic-bezier(0.4, 0, 0.2, 1);
    --spring: cubic-bezier(0.22, 1, 0.36, 1);
    --t: 180ms;
+   /* height of the phone tab bar (components/nav), without the safe-area inset */
+   --mobile-nav-h: 64px;
  }
 
  /* ─── Reset ─── */
@@ -34,9 +36,14 @@
    padding: 0;
  }
 
+ html {
+   -webkit-text-size-adjust: 100%;
+   text-size-adjust: 100%;
+ }
+
  html,
  body {
-   min-height: 100vh;
+   min-height: 100%;
    font-family: 'DM Sans', sans-serif;
    background: var(--bg);
    color: var(--slate-900);
@@ -78,5 +85,22 @@
    to {
      opacity: 1;
      transform: translateY(0);
+   }
+ }
+ /* ─── Touch devices ───
+    iOS Safari zooms into any input whose font-size is below 16px. */
+ @media (max-width: 1024px) {
+
+   input,
+   select,
+   textarea {
+     font-size: 16px !important;
+   }
+ }
+
+ @media (max-width: 640px) {
+   h1 {
+     font-size: 23px;
+     overflow-wrap: anywhere;
    }
  }

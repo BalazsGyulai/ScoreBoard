@@ -9,7 +9,7 @@ export default function Input({ id, title, placeholder = "", icon, type = "text"
     type?: string,
     title?: string,
     placeholder?: string,
-    icon?: React.ReactElement<any, any>,
+    icon?: React.ReactElement,
     autoComplete?: string,
     value?: string,
     defaultValue?: string | number,

@@ -9,6 +9,22 @@
     pointer-events: none;
 }
 
+/* Phone: full width, above the bottom tab bar */
+@media (max-width: 640px) {
+    .toast-container {
+        left: 16px;
+        right: 16px;
+        bottom: calc(var(--mobile-nav-h) + 12px + env(safe-area-inset-bottom));
+    }
+
+    .toast {
+        min-width: 0;
+        max-width: none;
+        width: 100%;
+        min-height: 44px;
+    }
+}
+
 .toast {
     pointer-events: all;
     background: rgba(255, 255, 255, 0.92);

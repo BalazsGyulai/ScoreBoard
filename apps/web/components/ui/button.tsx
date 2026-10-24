@@ -5,7 +5,7 @@ import styles from "./button.module.css"
 export default function Button({ text, onClick = () => { }, icon, disabled = false }: {
     text: string,
     onClick?: MouseEventHandler<HTMLButtonElement>,
-    icon?: ReactElement<any, any>,
+    icon?: ReactElement,
     disabled?: boolean
 }) {
     return (

@@ -126,9 +126,9 @@ export default function GrpcLiveViewerPage() {
 
   // ── Derived data ──
 
-  const players = state?.players ?? [];
-  const scores = state?.scores ?? [];
   const game = state?.game;
+  const players = useMemo(() => state?.players ?? [], [state]);
+  const scores = useMemo(() => state?.scores ?? [], [state]);
 
   // Group scores by round
   const rounds = useMemo(() => {
@@ -240,8 +240,7 @@ export default function GrpcLiveViewerPage() {
 
       {/* Score table */}
       {players.length > 0 && (
-        <div className={styles["tbl-wrap"]}>
-          <div className={styles["scroll-hint"]}>
+        <div className={styles["tbl-wrap"]} data-table-scroll>
             <table className={styles["score-tbl"]}>
               <thead>
                 <tr>
@@ -297,7 +296,6 @@ export default function GrpcLiveViewerPage() {
                 )}
               </tbody>
             </table>
-          </div>
         </div>
       )}
     </div>

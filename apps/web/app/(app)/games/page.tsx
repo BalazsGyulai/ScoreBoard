@@ -1,37 +1,19 @@
 "use client";
 
+import { fetchJson } from "@/lib/api/client";
+
 import Link from "next/link";
 import styles from "./games.module.css";
-import type { ApiGame, ApiError } from "@/types/api";
+import type { ApiGame } from "@/types/api";
 import useSWR from "swr";
 
 const GAMES_CACHE_KEY = "/api/games";
 
-async function fetchGames(url: string): Promise<ApiGame[]> {
-    const res = await fetch(url, {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-    });
-
-    if (!res.ok) {
-        let message = `Hiba (${res.status})`;
-        try {
-            const data = (await res.json()) as Partial<ApiError>;
-            message = data.error ?? message;
-        } catch {
-            // ignore parse errors
-        }
-        throw new Error(message);
-    }
-
-    return res.json() as Promise<ApiGame[]>;
-}
 
 export default function GamesPage() {
     const { data: games, isLoading, error } = useSWR<ApiGame[]>(
         GAMES_CACHE_KEY,
-        fetchGames,
+        fetchJson,
         {
             revalidateOnFocus: false,
             revalidateOnReconnect: false,

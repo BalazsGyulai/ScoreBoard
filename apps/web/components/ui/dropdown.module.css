@@ -161,3 +161,13 @@
   background: var(--orange-lt);
   color: #92400e;
 }
+
+@media (max-width: 1024px) {
+  .trigger {
+    height: 48px;
+  }
+
+  .option {
+    min-height: 44px;
+  }
+}

@@ -5,11 +5,12 @@
   left: 0;
   inset: 0;
   z-index: 200;
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 16px;
 }
 
 .backdrop {
@@ -34,8 +35,10 @@
 .popup {
   position: relative;
   z-index: 1;
-  width: 380px;
+  width: min(380px, 100%);
   max-height: 85vh;
+  max-height: 85dvh;
+  overflow-y: auto;
   background: var(--card);
   border: 1px solid var(--slate-200);
   border-radius: 20px;
@@ -46,6 +49,16 @@
   display: flex;
   flex-direction: column;
   animation: popIn 0.25s var(--spring) both;
+}
+
+/* only the icon grid shrinks (and scrolls) when the popup runs out of height */
+.popup > * {
+  flex-shrink: 0;
+}
+
+.popup > .grid {
+  flex-shrink: 1;
+  min-height: 88px;
 }
 
 @keyframes popIn {
@@ -254,4 +267,38 @@
 .selectBtn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+/* ── Touch: 44px tap targets, fewer columns on narrow phones ── */
+@media (max-width: 1024px) {
+  .closeBtn {
+    width: 44px;
+    height: 44px;
+  }
+
+  .catBtn {
+    min-height: 44px;
+  }
+
+  .selectBtn {
+    min-height: 44px;
+  }
+
+  .iconBtn {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 480px) {
+  .popup {
+    padding: 20px 16px;
+  }
+
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+    max-height: 40dvh;
+  }
+
+  .footer {
+    gap: 12px;
+  }
 }

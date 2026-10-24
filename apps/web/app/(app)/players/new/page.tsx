@@ -1,5 +1,7 @@
 "use client";
 
+import { apiFetch } from "@/lib/api/client";
+
 import { useState, useTransition } from "react";
 import { User, AtSign, Shield } from "lucide-react";
 import { mutate } from "swr";
@@ -37,7 +39,7 @@ export default function NewPlayerPage() {
 
         startTransition(async () => {
             try {
-                const res = await fetch("/api/players", {
+                const res = await apiFetch("/api/players", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     credentials: "include",

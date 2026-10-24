@@ -67,3 +67,12 @@
   font-size: 12px;
   padding: 0 10px;
 }
+
+/* ── Touch: 44px tap targets ── */
+@media (max-width: 1024px) {
+  .btn,
+  .btn-sm {
+    height: 44px;
+    padding: 0 14px;
+  }
+}

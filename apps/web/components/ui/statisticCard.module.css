@@ -48,3 +48,14 @@
 .stat-card.dark .stat-sub {
     color: rgba(255, 255, 255, .35);
 }
+@media (max-width: 640px) {
+    .stat-card {
+        padding: 16px;
+        min-width: 0;
+    }
+
+    .stat-value {
+        font-size: 24px;
+        overflow-wrap: anywhere;
+    }
+}
