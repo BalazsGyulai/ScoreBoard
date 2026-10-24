@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT a.id, a.user_id, u.username, a.round, a.value\n               FROM score_archives a\n               JOIN users u ON u.id = a.user_id\n               WHERE a.game_id = $1\n                 AND a.snapshot_id = (\n                     SELECT sa.snapshot_id FROM score_archives sa\n                     WHERE sa.game_id = $1\n                     ORDER BY sa.archived_at DESC\n                     LIMIT 1\n                 )\n               ORDER BY a.round ASC, u.username ASC",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "username",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "round",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 4,
+        "name": "value",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "944721b881499ded9a9cf6427db3ea56c8fa8bbc14ecc06788bb62d9a17150fa"
+}

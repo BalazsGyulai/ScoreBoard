@@ -1,16 +1,21 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, username FROM users WHERE group_id = $1 ORDER BY username",
+  "query": "SELECT group_id, username, role::TEXT AS \"role!\" FROM users WHERE id = $1",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "id",
+        "name": "group_id",
         "type_info": "Uuid"
       },
       {
         "ordinal": 1,
         "name": "username",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "role!",
         "type_info": "Text"
       }
     ],
@@ -21,8 +26,9 @@
     },
     "nullable": [
       false,
-      false
+      false,
+      null
     ]
   },
-  "hash": "b92bd42e70bd0facbe632f281334583a89fa387dec7b8b6b246d850874505950"
+  "hash": "89d8b9c22903ba9732b6359df97f57fae18cd0cea27e4e962c5c6cb4ec49dd65"
 }

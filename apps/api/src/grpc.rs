@@ -7,9 +7,9 @@
 use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::StreamExt;
 use tonic::{Request, Response, Status};
-use uuid::Uuid;
 
 use crate::sse::broadcaster::GameEvent as SseEvent;
+use crate::sse::handlers::{fetch_game_state, resolve_share};
 use crate::AppState;
 
 // Include the generated protobuf code.
@@ -50,29 +50,15 @@ impl GameStream for GameStreamService {
     ) -> Result<Response<Self::WatchGameStream>, Status> {
         let token = &request.get_ref().token;
 
-        // Validate the share token (same logic as SSE handler).
-        let share = sqlx::query(
-            r#"
-            SELECT gs.game_id, g.group_id
-            FROM game_shares gs
-            JOIN games g ON g.id = gs.game_id
-            WHERE gs.token = $1
-            "#,
-        )
-        .bind(token)
-        .fetch_optional(&self.state.db)
-        .await
-        .map_err(|_| Status::internal("Database error"))?;
-
-        let share = share.ok_or_else(|| Status::not_found("Invalid or expired share token"))?;
-
-        use sqlx::Row;
-        let game_id: Uuid = share.get("game_id");
-        let group_id: Uuid = share.get("group_id");
-
-        // Fetch initial state.
-        let init = fetch_game_state_grpc(&self.state, game_id, group_id)
+        // Same token check and same read-only, single-game view as the SSE endpoint.
+        let game_id = resolve_share(&self.state, token)
             .await
+            .map_err(|_| Status::internal("Database error"))?
+            .ok_or_else(|| Status::not_found("Invalid or expired share token"))?;
+
+        let init = fetch_game_state(&self.state, game_id)
+            .await
+            .map(to_snapshot)
             .map_err(|_| Status::internal("Failed to fetch game state"))?;
 
         // Subscribe to broadcaster events.
@@ -108,63 +94,32 @@ impl GameStream for GameStreamService {
     }
 }
 
-/// Fetch full game state and convert to protobuf types.
-async fn fetch_game_state_grpc(
-    state: &AppState,
-    game_id: Uuid,
-    group_id: Uuid,
-) -> Result<GameStateSnapshot, sqlx::Error> {
-    let game = sqlx::query!(
-        r#"SELECT id, name, icon, winner_rule, current_round, status::TEXT AS "status!"
-           FROM games WHERE id = $1"#,
-        game_id,
-    )
-    .fetch_one(&state.db)
-    .await?;
-
-    let players = sqlx::query!(
-        "SELECT id, username FROM users WHERE group_id = $1 ORDER BY username",
-        group_id,
-    )
-    .fetch_all(&state.db)
-    .await?;
-
-    let scores = sqlx::query!(
-        r#"SELECT s.id, s.user_id, u.username, s.round, s.value
-           FROM scores s
-           JOIN users u ON u.id = s.user_id
-           WHERE s.game_id = $1
-           ORDER BY s.round ASC, u.username ASC"#,
-        game_id,
-    )
-    .fetch_all(&state.db)
-    .await?;
-
-    Ok(GameStateSnapshot {
+/// Convert the shared viewer state into protobuf types.
+fn to_snapshot(state: crate::sse::broadcaster::GameState) -> GameStateSnapshot {
+    GameStateSnapshot {
         game: Some(GameInfo {
-            id: game.id.to_string(),
-            name: game.name,
-            icon: game.icon,
-            winner_rule: game.winner_rule,
-            current_round: game.current_round,
-            status: game.status,
+            id: state.game.id,
+            name: state.game.name,
+            icon: state.game.icon,
+            winner_rule: state.game.winner_rule,
+            current_round: state.game.current_round,
+            status: state.game.status,
         }),
-        players: players
+        players: state
+            .players
             .into_iter()
-            .map(|p| PlayerInfo {
-                id: p.id.to_string(),
-                username: p.username,
-            })
+            .map(|p| PlayerInfo { id: p.id, username: p.username })
             .collect(),
-        scores: scores
+        scores: state
+            .scores
             .into_iter()
             .map(|s| ScoreRow {
-                id: s.id.to_string(),
-                user_id: s.user_id.to_string(),
+                id: s.id,
+                user_id: s.user_id,
                 username: s.username,
                 round: s.round,
                 value: s.value,
             })
             .collect(),
-    })
+    }
 }

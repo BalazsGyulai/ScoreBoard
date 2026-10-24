@@ -23,6 +23,7 @@ pub fn build(state: AppState) -> Router {
 
     let live_routes = Router::new()
         .route("/live/{token}/stream", get(sse::handlers::stream))
+        .route("/live/{token}/state", get(sse::handlers::state))
         .with_state(state.clone())
         .layer(live_cors);
 
@@ -30,6 +31,7 @@ pub fn build(state: AppState) -> Router {
         // ── Auth ──────────────────────────────────────────────────────────────
         .route("/auth/register", post(handlers::register))
         .route("/auth/login",    post(handlers::login))
+        .route("/auth/refresh",  post(handlers::refresh))
         .route("/auth/logout",   post(handlers::logout))
         .route("/auth/me",       get(handlers::me))
 

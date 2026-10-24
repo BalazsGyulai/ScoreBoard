@@ -1,16 +1,16 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT username, role::TEXT as \"role!\"\n        FROM users\n        WHERE id = $1 AND group_id = $2\n        LIMIT 1\n        ",
+  "query": "SELECT current_round, status::TEXT AS \"status!\" FROM games WHERE id = $1 AND group_id = $2",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "username",
-        "type_info": "Text"
+        "name": "current_round",
+        "type_info": "Int4"
       },
       {
         "ordinal": 1,
-        "name": "role!",
+        "name": "status!",
         "type_info": "Text"
       }
     ],
@@ -25,5 +25,5 @@
       null
     ]
   },
-  "hash": "eff82f209902cc9516dfa781d7c01945cde83698d7dbcfed639cb3e2012f0699"
+  "hash": "1fa463b7d13fa74bdf4bee430595bc1980ab682d9ddbcae5eecc5b39709a548b"
 }

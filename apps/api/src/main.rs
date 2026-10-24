@@ -15,6 +15,9 @@ async fn main() {
 
     let config = Config::from_env();
     let db = create_pool(&config.database_url).await;
+    api::db::schema::ensure(&db)
+        .await
+        .expect("Failed to apply required schema (migrations/0008_refresh_token_rotation.sql)");
     let state = AppState {
         db,
         config: config.clone(),

@@ -133,7 +133,7 @@ pub async fn add_round(
 
     // Fetch game and verify ownership
     let game = sqlx::query!(
-        "SELECT current_round FROM games WHERE id = $1 AND group_id = $2",
+        r#"SELECT current_round, status::TEXT AS "status!" FROM games WHERE id = $1 AND group_id = $2"#,
         game_id,
         auth.group_id,
     )
@@ -141,10 +141,36 @@ pub async fn add_round(
     .await;
 
     let current_round = match game {
+        Ok(Some(g)) if g.status == "closed" => {
+            return (StatusCode::CONFLICT, Json(serde_json::json!({ "error": "Game is closed" }))).into_response();
+        }
         Ok(Some(g)) => g.current_round,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
         Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     };
+
+    // Every player must be a member of the caller's group — otherwise a leader could
+    // attach scores (and expose usernames) of users from another group.
+    let mut player_ids: Vec<Uuid> = body.scores.iter().map(|s| s.player_id).collect();
+    player_ids.sort();
+    player_ids.dedup();
+    if player_ids.len() != body.scores.len() {
+        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": "Duplicate player in round" }))).into_response();
+    }
+
+    let members = sqlx::query_scalar!(
+        r#"SELECT COUNT(*) AS "count!" FROM users WHERE group_id = $1 AND id = ANY($2)"#,
+        auth.group_id,
+        &player_ids,
+    )
+    .fetch_one(&state.db)
+    .await;
+
+    match members {
+        Ok(n) if n == player_ids.len() as i64 => {}
+        Ok(_) => return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": "Unknown player" }))).into_response(),
+        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
 
     let mut tx = match state.db.begin().await {
         Ok(tx) => tx,
@@ -226,6 +252,6 @@ pub async fn update_score(
             Json(serde_json::json!({ "value": body.value })).into_response()
         }
         Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "Score not found or access denied" }))).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() }))).into_response(),
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
 }

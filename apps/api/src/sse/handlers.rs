@@ -13,44 +13,11 @@ use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::StreamExt;
 use uuid::Uuid;
 
-use crate::{auth::middleware::AuthUser, AppState};
+use crate::{auth::{middleware::AuthUser, refresh::random_token}, AppState};
 use super::broadcaster::{GameInfo, GameState, PlayerInfo, ScoreRow};
 
 fn is_leader(role: &str) -> bool {
     role == "leader"
-}
-
-/// Generate a URL-safe random token (32 bytes → 43-char base64url, no padding).
-fn generate_token() -> String {
-    use std::io::Read;
-    let mut buf = [0u8; 32];
-    if std::fs::File::open("/dev/urandom")
-        .and_then(|mut f| f.read_exact(&mut buf))
-        .is_err()
-    {
-        return format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
-    }
-    base64_url_encode(&buf)
-}
-
-fn base64_url_encode(data: &[u8]) -> String {
-    const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
-    let mut result = String::with_capacity((data.len() * 4 + 2) / 3);
-    for chunk in data.chunks(3) {
-        let b0 = chunk[0] as u32;
-        let b1 = chunk.get(1).copied().unwrap_or(0) as u32;
-        let b2 = chunk.get(2).copied().unwrap_or(0) as u32;
-        let triple = (b0 << 16) | (b1 << 8) | b2;
-        result.push(CHARS[((triple >> 18) & 0x3F) as usize] as char);
-        result.push(CHARS[((triple >> 12) & 0x3F) as usize] as char);
-        if chunk.len() > 1 {
-            result.push(CHARS[((triple >> 6) & 0x3F) as usize] as char);
-        }
-        if chunk.len() > 2 {
-            result.push(CHARS[(triple & 0x3F) as usize] as char);
-        }
-    }
-    result
 }
 
 #[derive(Serialize)]
@@ -91,7 +58,7 @@ pub async fn create_share(
         Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
 
-    let token = generate_token();
+    let token = random_token();
     let share_id = Uuid::new_v4();
 
     // Upsert: replace existing share if one exists (ON CONFLICT on game_id)
@@ -138,11 +105,13 @@ pub async fn delete_share(
     .execute(&state.db)
     .await;
 
-    // Remove broadcast channel so existing viewers disconnect
-    state.broadcaster.remove(game_id);
-
     match result {
-        Ok(r) if r.rows_affected() > 0 => StatusCode::NO_CONTENT.into_response(),
+        Ok(r) if r.rows_affected() > 0 => {
+            // Remove broadcast channel so existing viewers disconnect. Only after the
+            // ownership check above, so nobody can drop another group's viewers.
+            state.broadcaster.remove(game_id);
+            StatusCode::NO_CONTENT.into_response()
+        }
         Ok(_) => StatusCode::NOT_FOUND.into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
@@ -188,35 +157,54 @@ pub async fn get_share(
     }
 }
 
+/// Resolve a public share token to its game. The token is the only credential a
+/// viewer has, and it grants read access to that single game and nothing else.
+pub async fn resolve_share(state: &AppState, token: &str) -> Result<Option<Uuid>, sqlx::Error> {
+    let row = sqlx::query("SELECT game_id FROM game_shares WHERE token = $1")
+        .bind(token)
+        .fetch_optional(&state.db)
+        .await?;
+    Ok(row.map(|r| r.get("game_id")))
+}
+
+fn invalid_share() -> Response {
+    (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "Invalid or expired share link" }))).into_response()
+}
+
+// GET /live/:token/state — read-only JSON snapshot (polling fallback for viewers)
+pub async fn state(
+    State(state): State<AppState>,
+    Path(token): Path<String>,
+) -> Response {
+    let game_id = match resolve_share(&state, &token).await {
+        Ok(Some(id)) => id,
+        Ok(None) => return invalid_share(),
+        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    };
+
+    match fetch_game_state(&state, game_id).await {
+        Ok(s) => (
+            [(axum::http::header::CACHE_CONTROL, "no-store")],
+            Json(s),
+        )
+            .into_response(),
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
+}
+
 // GET /live/:token/stream — SSE stream for viewers (no JWT required, token-based auth)
 pub async fn stream(
     State(state): State<AppState>,
     Path(token): Path<String>,
 ) -> Response {
-    // Look up the share by token
-    let share = sqlx::query(
-        r#"
-        SELECT gs.game_id, g.group_id
-        FROM game_shares gs
-        JOIN games g ON g.id = gs.game_id
-        WHERE gs.token = $1
-        "#,
-    )
-    .bind(&token)
-    .fetch_optional(&state.db)
-    .await;
-
-    let share = match share {
-        Ok(Some(s)) => s,
-        Ok(None) => return (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "Invalid or expired share link" }))).into_response(),
+    let game_id = match resolve_share(&state, &token).await {
+        Ok(Some(id)) => id,
+        Ok(None) => return invalid_share(),
         Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     };
 
-    let game_id: Uuid = share.get("game_id");
-    let group_id: Uuid = share.get("group_id");
-
     // Fetch initial state
-    let init = match fetch_game_state(&state, game_id, group_id).await {
+    let init = match fetch_game_state(&state, game_id).await {
         Ok(s) => s,
         Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     };
@@ -232,13 +220,7 @@ pub async fn stream(
 
     let broadcast_stream = BroadcastStream::new(rx).filter_map(|result| {
         match result {
-            Ok(event) => {
-                let sse_event = Event::default()
-                    .event("update")
-                    .json_data(&event)
-                    .ok();
-                sse_event
-            }
+            Ok(event) => Event::default().event("update").json_data(&event).ok(),
             Err(_) => None, // lagged — skip
         }
     });
@@ -246,16 +228,24 @@ pub async fn stream(
     let stream = tokio_stream::once(Ok::<_, std::convert::Infallible>(init_event))
         .chain(broadcast_stream.map(Ok));
 
-    Sse::new(stream)
-        .keep_alive(KeepAlive::default())
+    (
+        // no-transform: proxies (and Next's gzip) must not buffer the stream
+        [
+            (axum::http::header::CACHE_CONTROL, "no-cache, no-transform"),
+            (axum::http::HeaderName::from_static("x-accel-buffering"), "no"),
+        ],
+        Sse::new(stream).keep_alive(KeepAlive::default()),
+    )
         .into_response()
 }
 
-/// Fetch full game state for the initial SSE snapshot.
-async fn fetch_game_state(
+/// Read-only game state for the public viewer.
+///
+/// Only this game's data is exposed: its players are the ones who have scores in it,
+/// not the whole group. A closed game shows its latest final snapshot.
+pub async fn fetch_game_state(
     state: &AppState,
     game_id: Uuid,
-    group_id: Uuid,
 ) -> Result<GameState, sqlx::Error> {
     let game = sqlx::query!(
         r#"SELECT id, name, icon, winner_rule, current_round, status::TEXT AS "status!"
@@ -265,23 +255,61 @@ async fn fetch_game_state(
     .fetch_one(&state.db)
     .await?;
 
-    let players = sqlx::query!(
-        "SELECT id, username FROM users WHERE group_id = $1 ORDER BY username",
-        group_id,
-    )
-    .fetch_all(&state.db)
-    .await?;
+    let scores: Vec<ScoreRow> = if game.status == "closed" {
+        sqlx::query!(
+            r#"SELECT a.id, a.user_id, u.username, a.round, a.value
+               FROM score_archives a
+               JOIN users u ON u.id = a.user_id
+               WHERE a.game_id = $1
+                 AND a.snapshot_id = (
+                     SELECT sa.snapshot_id FROM score_archives sa
+                     WHERE sa.game_id = $1
+                     ORDER BY sa.archived_at DESC
+                     LIMIT 1
+                 )
+               ORDER BY a.round ASC, u.username ASC"#,
+            game_id,
+        )
+        .fetch_all(&state.db)
+        .await?
+        .into_iter()
+        .map(|s| ScoreRow {
+            id: s.id.to_string(),
+            user_id: s.user_id.to_string(),
+            username: s.username,
+            round: s.round,
+            value: s.value,
+        })
+        .collect()
+    } else {
+        sqlx::query!(
+            r#"SELECT s.id, s.user_id, u.username, s.round, s.value
+               FROM scores s
+               JOIN users u ON u.id = s.user_id
+               WHERE s.game_id = $1
+               ORDER BY s.round ASC, u.username ASC"#,
+            game_id,
+        )
+        .fetch_all(&state.db)
+        .await?
+        .into_iter()
+        .map(|s| ScoreRow {
+            id: s.id.to_string(),
+            user_id: s.user_id.to_string(),
+            username: s.username,
+            round: s.round,
+            value: s.value,
+        })
+        .collect()
+    };
 
-    let scores = sqlx::query!(
-        r#"SELECT s.id, s.user_id, u.username, s.round, s.value
-           FROM scores s
-           JOIN users u ON u.id = s.user_id
-           WHERE s.game_id = $1
-           ORDER BY s.round ASC, u.username ASC"#,
-        game_id,
-    )
-    .fetch_all(&state.db)
-    .await?;
+    let mut players: Vec<PlayerInfo> = Vec::new();
+    for s in &scores {
+        if !players.iter().any(|p| p.id == s.user_id) {
+            players.push(PlayerInfo { id: s.user_id.clone(), username: s.username.clone() });
+        }
+    }
+    players.sort_by(|a, b| a.username.cmp(&b.username));
 
     Ok(GameState {
         game: GameInfo {
@@ -292,22 +320,7 @@ async fn fetch_game_state(
             current_round: game.current_round,
             status: game.status,
         },
-        players: players
-            .into_iter()
-            .map(|p| PlayerInfo {
-                id: p.id.to_string(),
-                username: p.username,
-            })
-            .collect(),
-        scores: scores
-            .into_iter()
-            .map(|s| ScoreRow {
-                id: s.id.to_string(),
-                user_id: s.user_id.to_string(),
-                username: s.username,
-                round: s.round,
-                value: s.value,
-            })
-            .collect(),
+        players,
+        scores,
     })
 }

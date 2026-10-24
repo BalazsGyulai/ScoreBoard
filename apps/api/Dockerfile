@@ -6,6 +6,8 @@ COPY apps/api/Cargo.toml apps/api/Cargo.lock ./apps/api/
 COPY apps/api/build.rs ./apps/api/build.rs
 COPY apps/api/src ./apps/api/src
 COPY apps/api/.sqlx ./apps/api/.sqlx
+# migrations/0008 is compiled into the binary (applied on startup, see src/db/schema.rs)
+COPY apps/api/migrations ./apps/api/migrations
 COPY packages/proto ./packages/proto
 
 ENV SQLX_OFFLINE=true
@@ -18,7 +20,6 @@ WORKDIR /app
 COPY --from=builder /app/apps/api/target/release/api ./api
 COPY --from=builder /app/apps/api/target/release/import_legacy_mysql ./import_legacy_mysql
 COPY apps/api/migrations ./migrations
-COPY apps/api/_legacy_mysql_dump.sql ./_legacy_mysql_dump.sql
 
 EXPOSE 8080
 CMD ["./api"]
