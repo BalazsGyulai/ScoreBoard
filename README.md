@@ -1,5 +1,30 @@
 NOTE: Not open-source yet, it's still under development...
 
+# Testing
+
+Everything needs PostgreSQL with the migrations applied (`docker compose up db`).
+
+```bash
+# API: unit + integration tests (auth, token refresh, cross-group authorization)
+cd apps/api && DATABASE_URL=postgres://homegame:homegame@localhost:5432/homegame cargo test
+
+# Web: lint, unit tests
+npm run lint
+npm run test:run --workspace=apps/web
+
+# Web: end-to-end (mobile layout at 360/390/768/1280 px + session lifetime).
+# Builds the app and starts the API + web servers itself.
+npm run test:e2e --workspace=apps/web
+```
+
+# Sessions
+
+Access tokens (JWT, `hg_access_token`) live `JWT_ACCESS_EXPIRY_MINUTES` (15). Refresh tokens
+(`hg_refresh_token`) are opaque, stored hashed in `refresh_tokens`, rotated on every use and
+live `JWT_REFRESH_EXPIRY_DAYS` (30, sliding). `apps/web/middleware.ts` refreshes before the
+access token expires, `lib/api/client.ts` retries once after a 401, and
+`components/auth/authKeepAlive.tsx` keeps an open tab (or a phone waking up) logged in.
+
 # Folder Sturcture
 ```
 homegame/
