@@ -1,15 +1,7 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { serverFetch } from "@/lib/api/server";
+import { getCurrentUserId } from "@/lib/auth/session";
+import { errorResponse, serverFetch } from "@/lib/api/server";
 import type { ApiGame, ApiPlayer } from "@/types/api";
-
-interface ApiPlayerStat {
-  id: string;
-  username: string;
-  wins: number;
-  losses: number;
-  total_rounds: number;
-}
 
 interface ApiPlacement {
   snapshot_id: string;
@@ -26,29 +18,9 @@ function formatLastPlayed(date: Date | null) {
   return `${diffDays} napja`;
 }
 
-function decodeJwtPayload(token: string): Record<string, unknown> | null {
-  const parts = token.split(".");
-  if (parts.length < 2) return null;
-  try {
-    const payloadBase64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-    const padded = payloadBase64.padEnd(
-      payloadBase64.length + ((4 - (payloadBase64.length % 4)) % 4),
-      "=",
-    );
-    const json = Buffer.from(padded, "base64").toString("utf-8");
-    return JSON.parse(json) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
-}
-
 export async function GET() {
   try {
-    const jar = await cookies();
-    const token = jar.get("hg_access_token")?.value;
-    const claims = token ? decodeJwtPayload(token) : null;
-    const currentUserId =
-      claims && typeof claims.sub === "string" ? claims.sub : null;
+    const currentUserId = await getCurrentUserId();
 
     const [games, players, placements] = await Promise.all([
       serverFetch<ApiGame[]>("/games"),
@@ -78,7 +50,6 @@ export async function GET() {
       lastPlayed: formatLastPlayed(latestPlayed),
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Nem sikerult betolteni";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse(error);
   }
 }

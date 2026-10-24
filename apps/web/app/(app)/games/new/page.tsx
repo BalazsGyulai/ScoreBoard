@@ -1,5 +1,7 @@
 "use client";
 
+import { fetchJson, apiFetch } from "@/lib/api/client";
+
 import { useState, useTransition } from "react";
 import { Dices, Star } from "lucide-react";
 import useSWR, { mutate } from "swr";
@@ -30,17 +32,6 @@ const winnerRuleOptions = [
 
 type MeResponse = { role: string };
 
-async function fetchJson<T>(url: string): Promise<T> {
-    const res = await fetch(url, {
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        cache: "no-store",
-    });
-    if (!res.ok) {
-        throw new Error(`Hiba (${res.status})`);
-    }
-    return res.json() as Promise<T>;
-}
 
 export default function NewGamePage() {
     const [isPending, startTransition] = useTransition();
@@ -77,7 +68,7 @@ export default function NewGamePage() {
 
         startTransition(async () => {
             try {
-                const res = await fetch("/api/games", {
+                const res = await apiFetch("/api/games", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     credentials: "include",

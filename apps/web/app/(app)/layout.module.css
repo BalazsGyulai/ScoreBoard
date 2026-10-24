@@ -2,12 +2,31 @@
    background-image: radial-gradient(circle, #CBD5E1 1px, transparent 1px);
    background-size: 28px 28px;
    padding: 0 16px;
-   width: 100vw;
+   /* 100% rather than 100vw: 100vw includes the scrollbar and overflows horizontally */
+   width: 100%;
    min-height: 100vh;
+   min-height: 100dvh;
  }
 
  .page {
    max-width: 1100px;
    margin: 0 auto;
    padding: 92px 24px 60px;
+ }
+
+ @media (max-width: 1024px) {
+   .page {
+     padding: 96px 0 48px;
+   }
+ }
+
+ /* Phone: navigation moves to a bottom tab bar — keep content clear of it. */
+ @media (max-width: 640px) {
+   .dottedBackround {
+     padding: 0 max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left));
+   }
+
+   .page {
+     padding: max(20px, env(safe-area-inset-top)) 0 calc(var(--mobile-nav-h) + 24px + env(safe-area-inset-bottom));
+   }
  }

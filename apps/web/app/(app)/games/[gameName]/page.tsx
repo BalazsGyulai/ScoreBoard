@@ -1,5 +1,7 @@
 "use client";
 
+import { apiFetch, errorMessage, fetchJson } from "@/lib/api/client";
+
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { createPortal } from "react-dom";
@@ -20,7 +22,6 @@ import { dashboardCacheKeys } from "@/lib/dashboard/cacheKeys";
 import { isPlayerVisible, readHiddenPlayerIds } from "@/lib/playerVisibility";
 import type {
   AddRoundRequest,
-  ApiError,
   ApiGame,
   ApiPlayer,
   ApiScoreRow,
@@ -35,26 +36,6 @@ function slugify(name: string) {
   return name.trim().toLowerCase();
 }
 
-async function fetchJson<T>(url: string): Promise<T> {
-  const res = await fetch(url, {
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
-    cache: "no-store",
-  });
-
-  if (!res.ok) {
-    let message = `Hiba (${res.status})`;
-    try {
-      const data = (await res.json()) as Partial<ApiError>;
-      message = data.error ?? message;
-    } catch {
-      // ignore parse errors
-    }
-    throw new Error(message);
-  }
-
-  return res.json() as Promise<T>;
-}
 
 function buildScoreMap(scores: ApiScoreRow[]) {
   const scoreMap = new Map<number, Map<string, ApiScoreRow>>();
@@ -239,7 +220,7 @@ export default function ActiveGamePage() {
       return;
     }
 
-    const res = await fetch(`/api/games/${game.id}/scores`, {
+    const res = await apiFetch(`/api/games/${game.id}/scores`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -247,13 +228,7 @@ export default function ActiveGamePage() {
     });
 
     if (!res.ok) {
-      let message = `Hiba (${res.status})`;
-      try {
-        const data = (await res.json()) as Partial<ApiError>;
-        message = data.error ?? message;
-      } catch {
-        // ignore parse errors
-      }
+      const message = await errorMessage(res);
       showToast(message);
       return;
     }
@@ -290,7 +265,7 @@ export default function ActiveGamePage() {
       return;
     }
 
-    const res = await fetch(`/api/scores/${scoreId}`, {
+    const res = await apiFetch(`/api/scores/${scoreId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -298,13 +273,7 @@ export default function ActiveGamePage() {
     });
 
     if (!res.ok) {
-      let message = `Hiba (${res.status})`;
-      try {
-        const data = (await res.json()) as Partial<ApiError>;
-        message = data.error ?? message;
-      } catch {
-        // ignore parse errors
-      }
+      const message = await errorMessage(res);
       showToast(message);
       setEditingCell(null);
       return;
@@ -328,20 +297,14 @@ export default function ActiveGamePage() {
     if (!canManageGame) return;
     setIsSubmittingAction(true);
 
-    const res = await fetch(`/api/games/${game.id}/close`, {
+    const res = await apiFetch(`/api/games/${game.id}/close`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
     });
 
     if (!res.ok) {
-      let message = `Hiba (${res.status})`;
-      try {
-        const data = (await res.json()) as Partial<ApiError>;
-        message = data.error ?? message;
-      } catch {
-        // ignore parse errors
-      }
+      const message = await errorMessage(res);
       showToast(message);
       setIsSubmittingAction(false);
       return;
@@ -362,20 +325,14 @@ export default function ActiveGamePage() {
     if (!canManageGame) return;
     setIsSubmittingAction(true);
 
-    const res = await fetch(`/api/games/${game.id}/restart`, {
+    const res = await apiFetch(`/api/games/${game.id}/restart`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
     });
 
     if (!res.ok) {
-      let message = `Hiba (${res.status})`;
-      try {
-        const data = (await res.json()) as Partial<ApiError>;
-        message = data.error ?? message;
-      } catch {
-        // ignore parse errors
-      }
+      const message = await errorMessage(res);
       showToast(message);
       setIsSubmittingAction(false);
       return;
@@ -492,9 +449,11 @@ export default function ActiveGamePage() {
         </div>
       </div>
 
-      {/* ── Score table ── */}
-      <div className={styles["scroll-hint"]}>
-        <div className={styles["tbl-wrap"]}>
+      {/* ── Score table ──
+          .tbl-scroll is the horizontal scroll container; the card around it only
+          rounds the corners. The footer stays outside so it never scrolls away. */}
+      <div className={styles["tbl-wrap"]}>
+        <div className={styles["tbl-scroll"]} data-table-scroll>
           <table className={styles["score-tbl"]}>
             <thead>
               <tr>
@@ -505,7 +464,6 @@ export default function ActiveGamePage() {
                     {p.username}
                   </th>
                 ))}
-                <th style={{ width: 36 }} />
               </tr>
             </thead>
             <tbody>
@@ -529,7 +487,6 @@ export default function ActiveGamePage() {
                     </td>
                   );
                 })}
-                <td />
               </tr>
 
               {/* Input row — only for open games */}
@@ -548,15 +505,14 @@ export default function ActiveGamePage() {
                       />
                     </td>
                   ))}
-                  <td />
                 </tr>
               )}
 
               {/* Data rows */}
-              {roundNumbers.map((roundNo, ri) => (
+              {roundNumbers.map((roundNo) => (
                 <tr key={roundNo}>
                   <td>{roundNo}. kör</td>
-                  {orderedPlayers.map((p, pi) => {
+                  {orderedPlayers.map((p) => {
                     const score = scoreMap.get(roundNo)?.get(p.id);
                     const isEditing =
                       editingCell?.round === roundNo && editingCell?.userId === p.id;
@@ -583,13 +539,15 @@ export default function ActiveGamePage() {
                               autoFocus
                             />
                           ) : canManageGame && game?.status !== "closed" ? (
-                            <span
-                              className={styles["cell-val"]}
+                            <button
+                              type="button"
+                              className={`${styles["cell-val"]} ${styles["cell-btn"]}`}
                               onClick={() => startEdit(roundNo, p.id)}
                               title="Szerkesztés"
+                              aria-label={`${p.username}, ${roundNo}. kör: ${score.value} — szerkesztés`}
                             >
                               {score.value}
-                            </span>
+                            </button>
                           ) : (
                             <span className={styles["cell-val"]}>{score.value}</span>
                           )
@@ -601,18 +559,18 @@ export default function ActiveGamePage() {
                       </td>
                     );
                   })}
-                  <td />
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
 
           {/* Footer */}
           <div className={styles["tbl-foot"]}>
             <span className={styles["tbl-foot-info"]}>
               <strong>{rounds.length}</strong> kör lejátszva
             </span>
-            <div style={{ display: "flex", gap: 8 }}>
+            <div className={styles["tbl-foot-actions"]}>
               {canManageGame && game?.status !== "closed" && (
                 <>
                   <ActionButton
@@ -630,7 +588,6 @@ export default function ActiveGamePage() {
               )}
             </div>
           </div>
-        </div>
       </div>
 
       {isClient && pendingAction && createPortal((

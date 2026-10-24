@@ -1,9 +1,11 @@
-/* ── Live viewer page ── */
+/* ── Live viewer page (TV and phone) ── */
 
 .live-wrap {
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--bg);
-  padding: 32px 24px;
+  padding: max(24px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+    max(32px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -11,14 +13,16 @@
 
 .live-hdr {
   text-align: center;
-  margin-bottom: 28px;
+  margin-bottom: 20px;
+  max-width: 100%;
 }
 
 .live-hdr h1 {
   font-family: "Bricolage Grotesque", sans-serif;
-  font-size: 28px;
+  font-size: clamp(22px, 6vw, 28px);
   font-weight: 700;
   margin: 0 0 4px;
+  overflow-wrap: anywhere;
 }
 
 .live-hdr .icon {
@@ -42,6 +46,7 @@
   padding: 4px 12px;
   border-radius: 99px;
   margin-bottom: 20px;
+  text-align: center;
 }
 
 .status-connected {
@@ -64,6 +69,7 @@
   height: 7px;
   border-radius: 50%;
   display: inline-block;
+  flex-shrink: 0;
 }
 
 .status-connected .status-dot {
@@ -78,26 +84,39 @@
   background: var(--danger);
 }
 
-/* ── Table ── */
+.empty-msg {
+  color: var(--slate-500);
+  font-size: 14px;
+  padding: 24px 0;
+}
+
+/* ── Table ──
+   The wrapper itself is the horizontal scroll container (an overflow:hidden
+   wrapper around it would clip the table and break both scrolling and the
+   sticky first column). */
 
 .tbl-wrap {
   width: 100%;
   max-width: 900px;
   border-radius: 16px;
   border: 1px solid var(--slate-200);
-  overflow: hidden;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
   background: var(--card);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 20px rgba(0, 0, 0, 0.04);
 }
 
-.scroll-hint {
-  overflow-x: auto;
-}
-
 .score-tbl {
   width: 100%;
-  border-collapse: collapse;
-  min-width: 480px;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.score-tbl th,
+.score-tbl td {
+  min-width: 72px;
+  white-space: nowrap;
 }
 
 .score-tbl th:first-child,
@@ -107,7 +126,8 @@
   background: var(--card);
   z-index: 2;
   text-align: left;
-  min-width: 72px;
+  min-width: 56px;
+  box-shadow: 1px 0 0 var(--slate-200);
 }
 
 .score-tbl .total-row td:first-child {
@@ -115,7 +135,7 @@
 }
 
 .score-tbl thead th {
-  padding: 18px 14px;
+  padding: 16px 12px;
   font-family: "Bricolage Grotesque", sans-serif;
   font-size: 14px;
   font-weight: 600;
@@ -124,12 +144,9 @@
   text-align: center;
 }
 
-.total-row {
-  background: var(--slate-100);
-}
-
 .total-row td {
-  padding: 15px 14px;
+  background: var(--slate-100);
+  padding: 14px 12px;
   font-family: "Bricolage Grotesque", sans-serif;
   font-size: 20px;
   font-weight: 700;
@@ -155,12 +172,12 @@
   color: var(--danger);
 }
 
-.score-tbl tbody tr:not(.total-row) {
+.score-tbl tbody tr:not(.total-row) td {
   border-bottom: 1px solid var(--slate-100);
 }
 
 .score-tbl tbody td {
-  padding: 11px 14px;
+  padding: 11px 12px;
   font-size: 15px;
   color: var(--slate-700);
   text-align: center;
@@ -180,6 +197,7 @@
   align-items: center;
   justify-content: center;
   min-height: 60vh;
+  padding: 0 16px;
   text-align: center;
   color: var(--slate-500);
   font-size: 15px;
@@ -204,6 +222,6 @@
   padding: 3px 10px;
   border-radius: 99px;
   background: var(--slate-100);
-  color: var(--slate-600);
+  color: var(--slate-700);
   margin-top: 8px;
 }

@@ -3,6 +3,7 @@
 }
 
 .title-row {
+  flex-wrap: wrap;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -10,6 +11,7 @@
 }
 
 .year-controls {
+  flex-wrap: wrap;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -69,6 +71,8 @@
 
 .ovx {
   overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .section-hdr {
@@ -117,6 +121,10 @@
 
 .lb-name {
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-weight: 500;
   font-size: 14px;
 }
@@ -168,8 +176,23 @@
 /* ── Head-to-head table ── */
 .hth-table {
   width: 100%;
-  border-collapse: collapse;
-  min-width: 480px;
+  border-collapse: separate;
+  border-spacing: 0;
+  min-width: 560px;
+}
+
+.hth-table th,
+.hth-table td {
+  white-space: nowrap;
+}
+
+/* player name stays visible while the numbers scroll */
+.hth-table th:first-child,
+.hth-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--card);
 }
 
 .hth-table th {
@@ -194,4 +217,59 @@
 
 .hth-table td:not(:first-child) {
   text-align: center;
+}
+
+/* ── Touch ── */
+@media (max-width: 1024px) {
+  .lb-row {
+    min-height: 54px;
+  }
+}
+
+/* ── Phone ── */
+@media (max-width: 640px) {
+  .p24 {
+    padding: 16px;
+  }
+
+  .lb-row {
+    gap: 8px;
+  }
+
+  .lb-bar-w {
+    width: 44px;
+  }
+
+  .hth-table th,
+  .hth-table td {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .year-select,
+  .year-nav-btn {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 640px) {
+  .year-controls {
+    width: 100%;
+  }
+
+  .year-select {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+.player-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  text-decoration: none;
+  color: inherit;
 }

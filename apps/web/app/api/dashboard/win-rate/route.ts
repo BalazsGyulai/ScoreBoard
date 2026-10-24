@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { serverFetch } from "@/lib/api/server";
+import { getCurrentUserId } from "@/lib/auth/session";
+import { errorResponse, serverFetch } from "@/lib/api/server";
 
 interface ApiPlayerStat {
   id: string;
@@ -10,29 +10,9 @@ interface ApiPlayerStat {
   total_rounds: number;
 }
 
-function decodeJwtPayload(token: string): Record<string, unknown> | null {
-  const parts = token.split(".");
-  if (parts.length < 2) return null;
-  try {
-    const payloadBase64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-    const padded = payloadBase64.padEnd(
-      payloadBase64.length + ((4 - (payloadBase64.length % 4)) % 4),
-      "=",
-    );
-    const json = Buffer.from(padded, "base64").toString("utf-8");
-    return JSON.parse(json) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
-}
-
 export async function GET() {
   try {
-    const jar = await cookies();
-    const token = jar.get("hg_access_token")?.value;
-    const claims = token ? decodeJwtPayload(token) : null;
-    const currentUserId =
-      claims && typeof claims.sub === "string" ? claims.sub : null;
+    const currentUserId = await getCurrentUserId();
 
     const stats = await serverFetch<ApiPlayerStat[]>("/stats");
     const current = stats.find((row) => row.id === currentUserId) ?? null;
@@ -48,7 +28,6 @@ export async function GET() {
           : "Még nincs rögzített kör",
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Nem sikerült betölteni";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse(error);
   }
 }

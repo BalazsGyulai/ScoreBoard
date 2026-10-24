@@ -38,4 +38,6 @@ pub struct AuthResponse {
     pub group_id: Uuid,
     pub username: String,
     pub role: String,
+    /// Seconds until the access token expires — lets the client schedule a silent refresh.
+    pub access_expires_in: i64,
 }

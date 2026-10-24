@@ -1,5 +1,7 @@
 "use client";
 
+import { fetchJson } from "@/lib/api/client";
+
 import StatisticCard from "@/components/ui/statisticCard";
 import ScoreCard from "@/components/ui/scoreCard";
 import Link from "next/link";
@@ -41,26 +43,6 @@ type SummaryTableRow = LeaderboardRow & {
   trend: number[];
 };
 
-async function fetchJson<T>(url: string): Promise<T> {
-  const res = await fetch(url, {
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
-    cache: "no-store",
-  });
-
-  if (!res.ok) {
-    let message = `Hiba (${res.status})`;
-    try {
-      const data = (await res.json()) as { error?: string };
-      message = data.error ?? message;
-    } catch {
-      // ignore parse errors
-    }
-    throw new Error(message);
-  }
-
-  return res.json() as Promise<T>;
-}
 
 function avatarColor(seed: string) {
   const palette = [
@@ -245,7 +227,7 @@ export default function Dashboard() {
           <div className={styles["section-hdr"]}>
             <h2>Összesített táblázat</h2>
           </div>
-          <div className={styles.ovx}>
+          <div className={styles.ovx} data-table-scroll>
             <table className={styles["hth-table"]}>
               <thead>
                 <tr>

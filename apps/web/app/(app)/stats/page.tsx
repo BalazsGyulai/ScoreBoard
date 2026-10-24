@@ -1,5 +1,7 @@
 "use client";
 
+import { fetchJson } from "@/lib/api/client";
+
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
@@ -19,26 +21,6 @@ type SummaryTableRow = LeaderboardRow & {
   trend: number[];
 };
 
-async function fetchJson<T>(url: string): Promise<T> {
-  const res = await fetch(url, {
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
-    cache: "no-store",
-  });
-
-  if (!res.ok) {
-    let message = `Hiba (${res.status})`;
-    try {
-      const data = (await res.json()) as { error?: string };
-      message = data.error ?? message;
-    } catch {
-      // ignore parse errors
-    }
-    throw new Error(message);
-  }
-
-  return res.json() as Promise<T>;
-}
 
 function avatarColor(seed: string) {
   const palette = [
@@ -203,7 +185,7 @@ export default function StatsPage() {
           <div className={styles["section-hdr"]}>
             <h2>Összesített táblázat</h2>
           </div>
-          <div className={styles.ovx}>
+          <div className={styles.ovx} data-table-scroll>
             <table className={styles["hth-table"]}>
               <thead>
                 <tr>
@@ -228,16 +210,7 @@ export default function StatsPage() {
                   return (
                     <tr key={p.id}>
                       <td>
-                        <Link
-                          href={`/players/${p.id}`}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 8,
-                            textDecoration: "none",
-                            color: "inherit",
-                          }}
-                        >
+                        <Link href={`/players/${p.id}`} className={styles["player-link"]}>
                           <div
                             className={`${styles.avatar} ${styles.av36}`}
                             style={{

@@ -6,6 +6,15 @@
      align-items: center;
      justify-content: center;
      padding: 40px 16px;
-     width: 100vw;
-     height: 100vh;
+     width: 100%;
+     /* min-height (not height) so the page can scroll when the keyboard is open */
+     min-height: 100vh;
+     min-height: 100dvh;
+ }
+
+ @media (max-width: 640px) {
+     .dottedBackround {
+         align-items: flex-start;
+         padding: max(24px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
+     }
  }

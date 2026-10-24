@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { serverFetch } from "@/lib/api/server";
+import { errorResponse, serverFetch } from "@/lib/api/server";
 
 interface ApiPlayerStat {
   id: string;
@@ -28,7 +28,6 @@ export async function GET() {
       subLabel: `${mostActive.total_rounds} korban szerepelt`,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Nem sikerült betölteni";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse(error);
   }
 }

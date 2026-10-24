@@ -9,6 +9,14 @@ import Card from "@/components/ui/card";
 import { useTransition, useState } from "react";
 import { handleStringChange } from "@/lib/utils";
 
+// Only same-site paths: never let ?redirect= send the user to another origin.
+function safeRedirect(target: string | null) {
+    if (!target || !target.startsWith("/") || target.startsWith("//") || target.startsWith("/login")) {
+        return "/dashboard";
+    }
+    return target;
+}
+
 export default function LoginPage() {
     const [isPending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
@@ -37,7 +45,7 @@ export default function LoginPage() {
                 });
 
                 if (res.ok) {
-                    window.location.href = "/dashboard";
+                    window.location.href = safeRedirect(new URLSearchParams(window.location.search).get("redirect"));
                 } else {
                     let message = "Belépés sikertelen";
                     try {

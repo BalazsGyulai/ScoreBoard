@@ -1,6 +1,7 @@
 "use client";
 
 import Navigation from "@/components/nav/navigation";
+import AuthKeepAlive from "@/components/auth/authKeepAlive";
 import { ToastProvider } from "@/components/toast/toastProvider";
 import styles from "./layout.module.css"
 
@@ -11,6 +12,7 @@ export default function AppLayout({
 }) {
   return (
     <div className={`${styles.dottedBackround}`}>
+      <AuthKeepAlive />
       <ToastProvider>
         <Navigation />
 

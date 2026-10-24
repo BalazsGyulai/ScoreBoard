@@ -28,7 +28,8 @@ services:
       DATABASE_URL: postgres://homegame:homegame@db:5432/homegame
       JWT_SECRET: change-this-secret
       JWT_ACCESS_EXPIRY_MINUTES: "15"
-      JWT_REFRESH_EXPIRY_DAYS: "7"
+      JWT_REFRESH_EXPIRY_DAYS: "30"        # sliding: every refresh starts a new 30 days
+      REFRESH_REUSE_GRACE_SECONDS: "60"   # concurrent refreshes (two tabs) are not "token theft"
       PORT: "8080"
       RUST_LOG: info
     ports:

@@ -30,14 +30,16 @@
 .settings-panel {
     position: relative;
     z-index: 1;
-    width: 300px;
+    width: min(320px, 88vw);
     height: 100vh;
-    overflow-y: hidden;
+    height: 100dvh;
+    /* the panel scrolls as a whole: on a phone players + game info + sharing do not fit */
+    overflow-y: auto;
+    overscroll-behavior: contain;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
     background: var(--card);
-    padding: 32px 26px;
+    padding: max(32px, env(safe-area-inset-top)) 22px max(24px, env(safe-area-inset-bottom)) max(22px, env(safe-area-inset-left));
     box-shadow: 4px 0 40px rgba(0, 0, 0, .12);
     animation: slideIn .3s var(--spring) both;
 }
@@ -80,8 +82,7 @@
 
 .s-section {
     margin-bottom: 28px;
-    flex-grow: 2;
-    overflow-y: auto;
+    flex: 1 0 auto;
 }
 
 .active-section {
@@ -103,6 +104,7 @@
 }
 
 .s-row {
+    gap: 12px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -119,6 +121,8 @@
 }
 
 .s-row-val {
+    text-align: right;
+    overflow-wrap: anywhere;
     font-size: 13px;
     font-weight: 500;
     color: var(--slate-700);
@@ -395,35 +399,48 @@
 }
 
 .toggle {
+    /* the button is the 44px hit area; ::before draws the track, ::after the knob */
     position: relative;
-    width: 40px;
-    height: 22px;
-    border-radius: 99px;
-    background: var(--slate-200);
+    width: 52px;
+    height: 44px;
+    background: transparent;
     border: none;
     cursor: pointer;
-    transition: background var(--t) var(--ease);
     flex-shrink: 0;
 }
 
-.toggle.on {
+.toggle::before {
+    content: '';
+    position: absolute;
+    left: 4px;
+    right: 4px;
+    top: 50%;
+    height: 24px;
+    transform: translateY(-50%);
+    border-radius: 99px;
+    background: var(--slate-200);
+    transition: background var(--t) var(--ease);
+}
+
+.toggle.on::before {
     background: var(--slate-900);
 }
 
 .toggle::after {
     content: '';
     position: absolute;
-    top: 3px;
-    left: 3px;
-    width: 16px;
-    height: 16px;
+    top: 50%;
+    left: 7px;
+    width: 18px;
+    height: 18px;
     border-radius: 50%;
     background: #fff;
+    transform: translateY(-50%);
     transition: transform var(--t) var(--ease);
 }
 
 .toggle.on::after {
-    transform: translateX(18px);
+    transform: translate(20px, -50%);
 }
 
 .share-url-box {
@@ -469,4 +486,42 @@
 .share-copy-btn.copied {
     background: var(--success-lt);
     color: #065F46;
+}
+
+.logout-error {
+    color: var(--danger);
+    font-size: 13px;
+}
+
+/* ── Touch: 44px tap targets ── */
+@media (max-width: 1024px) {
+    .settings-close,
+    .pt-eye,
+    .share-copy-btn {
+        width: 44px;
+        height: 44px;
+    }
+
+    .settings-close {
+        top: max(14px, env(safe-area-inset-top));
+        right: 14px;
+    }
+
+    .pt-row {
+        min-height: 54px;
+    }
+
+    .s-label {
+        min-height: 44px;
+        margin-bottom: 8px;
+    }
+
+    .btn {
+        height: 46px;
+    }
+
+
+    .share-toggle-row {
+        min-height: 48px;
+    }
 }

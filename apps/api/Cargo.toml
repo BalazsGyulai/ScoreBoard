@@ -23,6 +23,7 @@ serde_json = "1"
 # Auth
 jsonwebtoken = "9"
 bcrypt       = "0.15"
+sha2         = "0.10"   # refresh tokens are stored as SHA-256 hashes, never in plain text
 
 # IDs
 uuid = { version = "1", features = ["v4", "serde"] }
@@ -54,4 +55,4 @@ tonic-build = "0.13"
 
 [dev-dependencies]
 # Integration test helper for axum 0.8
-axum-test = "16"
+axum-test = "17"

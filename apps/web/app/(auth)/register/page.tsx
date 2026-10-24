@@ -66,7 +66,7 @@ export default function RegisterPage() {
     return (
         <Card
             heading="Fiók létrehozása"
-            subHeading={<>Már van fiókod?{" "}<Link href="#" className={styles["inline-link"]}>Lépj be {<MoveRight size={8} />}</Link></>}
+            subHeading={<>Már van fiókod?{" "}<Link href="/login" className={styles["inline-link"]}>Lépj be {<MoveRight size={8} />}</Link></>}
         >
             <div className={styles.fields} id="regForm">
 
@@ -115,6 +115,8 @@ export default function RegisterPage() {
                 />
 
             </div>
+
+            {error && <p className={styles.error}>{error}</p>}
 
             <div className={styles.actions}>
                 <Button

@@ -11,7 +11,7 @@
 
 .games-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 13px;
 }
 
@@ -50,6 +50,7 @@
 
 .game-card h3 {
   margin-bottom: 3px;
+  overflow-wrap: anywhere;
 }
 
 .gc-meta {
@@ -81,4 +82,20 @@
 .badge-green {
   background: var(--success-lt);
   color: #065f46;
+}
+
+@media (max-width: 900px) {
+  .games-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .games-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .game-card {
+    padding: 16px;
+  }
 }

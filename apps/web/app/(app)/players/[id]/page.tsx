@@ -1,5 +1,7 @@
 "use client";
 
+import { fetchJson, apiFetch } from "@/lib/api/client";
+
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import useSWR, { mutate } from "swr";
@@ -62,26 +64,6 @@ type MeResponse = {
   role: string;
 };
 
-async function fetchJson<T>(url: string): Promise<T> {
-  const res = await fetch(url, {
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
-    cache: "no-store",
-  });
-
-  if (!res.ok) {
-    let message = `Hiba (${res.status})`;
-    try {
-      const data = (await res.json()) as { error?: string };
-      message = data.error ?? message;
-    } catch {
-      // ignore parse errors
-    }
-    throw new Error(message);
-  }
-
-  return res.json() as Promise<T>;
-}
 
 function avatarColor(seed: string) {
   const palette = ["#0F172A", "#475569", "#B45309", "#94A3B8", "#CBD5E1", "#E2E8F0", "#F1F5F9"];
@@ -113,10 +95,6 @@ export default function PlayerPage() {
   );
   const [selectedYear, setSelectedYear] = useState<string>("overall");
   const selectedYearValue = selectedYear === "overall" ? null : Number.parseInt(selectedYear, 10);
-  const selectedYearIndex = useMemo(() => {
-    if (!availableYears || selectedYearValue === null) return -1;
-    return availableYears.findIndex((year) => year === selectedYearValue);
-  }, [availableYears, selectedYearValue]);
 
   const { data: players } = useSWR<ApiPlayer[]>("/api/players", fetchJson);
   const { data: me } = useSWR<MeResponse>("/api/auth/me", fetchJson);
@@ -312,31 +290,6 @@ export default function PlayerPage() {
     router.push(`/players/${orderedRows[i].id}`);
   }
 
-  function prevYear() {
-    if (!availableYears || availableYears.length === 0) return;
-    if (selectedYear === "overall") {
-      setSelectedYear(String(availableYears[0]));
-      return;
-    }
-    if (selectedYearIndex < 0) return;
-    const target = availableYears[selectedYearIndex + 1];
-    if (target === undefined) {
-      setSelectedYear("overall");
-      return;
-    }
-    setSelectedYear(String(target));
-  }
-
-  function nextYear() {
-    if (!availableYears || availableYears.length === 0) return;
-    if (selectedYear === "overall") return;
-    if (selectedYearIndex <= 0) {
-      setSelectedYear(String(availableYears[0]));
-      return;
-    }
-    const target = availableYears[selectedYearIndex - 1];
-    if (target !== undefined) setSelectedYear(String(target));
-  }
 
   function openAccountModal() {
     setAccountEmail(selectedPlayer?.email ?? "");
@@ -393,7 +346,7 @@ export default function PlayerPage() {
         payload.password2 = accountPassword2;
       }
 
-      const res = await fetch(`/api/players/${selected.id}`, {
+      const res = await apiFetch(`/api/players/${selected.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -549,13 +502,7 @@ export default function PlayerPage() {
                 </div>
               ))}
             </div>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                marginTop: 6,
-              }}
-            >
+            <div className={styles["act-labels"]}>
               {activityLabels.map((label) => (
                 <span className={styles["act-label"]} key={label}>
                   {label}
@@ -623,7 +570,7 @@ export default function PlayerPage() {
           <div className={styles["modal-overlay"]}>
             <div className={styles["modal-backdrop"]} onClick={closeAccountModal} />
             <div className={styles["modal-panel"]}>
-              <button className={styles["modal-close"]} onClick={closeAccountModal}>
+              <button className={styles["modal-close"]} onClick={closeAccountModal} aria-label="Bezárás">
                 <X size={14} />
               </button>
               <h2>Fiók szerkesztése</h2>

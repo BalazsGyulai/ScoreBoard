@@ -85,3 +85,18 @@
      margin-bottom: 28px;
      animation: fadeUp 0.4s 0.18s both;
  }
+ @media (max-width: 640px) {
+     .card {
+         padding: 28px 20px 24px;
+         border-radius: 16px;
+     }
+
+     .brand {
+         margin-bottom: 20px;
+     }
+
+     .divider {
+         margin-top: 20px;
+         margin-bottom: 20px;
+     }
+ }

@@ -13,6 +13,10 @@
   margin-top: 28px;
 }
 
+.center > * {
+  min-width: 0;
+}
+
 /* ── Icon picker trigger (styled like an input field) ── */
 .field {
   display: flex;
@@ -29,7 +33,7 @@
 
 .iconTrigger {
   width: 100%;
-  height: 44px;
+  height: 48px;
   padding: 0 14px;
   font-family: "DM Sans", sans-serif;
   font-size: 14px;

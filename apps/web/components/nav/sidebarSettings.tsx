@@ -1,11 +1,13 @@
 "use client";
 
+import { fetchJson, apiFetch } from "@/lib/api/client";
+
 import { useEffect, useMemo, useState, useTransition } from "react";
 import useSWR from "swr";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogOut, X, Eye, Loader2, Plus, Copy, Check } from "lucide-react";
-import type { ApiError, ApiGame, ApiPlayer, ApiScoreRow, ViewerTokenResponse } from "@/types/api";
+import type { ApiGame, ApiPlayer, ApiScoreRow } from "@/types/api";
 import { readHiddenPlayerIds, writeHiddenPlayerIds } from "@/lib/playerVisibility";
 import styles from "./sidebarSettings.module.css";
 
@@ -147,7 +149,7 @@ export default function SidebarSettins({
         let cancelled = false;
         (async () => {
             try {
-                const res = await fetch(`/api/games/${activeGame.id}/share`, {
+                const res = await apiFetch(`/api/games/${activeGame.id}/share`, {
                     credentials: "include",
                 });
                 if (!res.ok) return;
@@ -163,13 +165,13 @@ export default function SidebarSettins({
         setShareLoading(true);
         try {
             if (shareData?.sharing) {
-                await fetch(`/api/games/${activeGame.id}/share`, {
+                await apiFetch(`/api/games/${activeGame.id}/share`, {
                     method: "DELETE",
                     credentials: "include",
                 });
                 setShareData({ sharing: false });
             } else {
-                const res = await fetch(`/api/games/${activeGame.id}/share`, {
+                const res = await apiFetch(`/api/games/${activeGame.id}/share`, {
                     method: "POST",
                     credentials: "include",
                 });
@@ -190,33 +192,13 @@ export default function SidebarSettins({
         setTimeout(() => setCopied(false), 2000);
     }
 
-    async function fetchJson<T>(url: string): Promise<T> {
-        const res = await fetch(url, {
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            cache: "no-store",
-        });
-
-        if (!res.ok) {
-            let message = `Hiba (${res.status})`;
-            try {
-                const data = (await res.json()) as Partial<ApiError>;
-                message = data.error ?? message;
-            } catch {
-                // ignore parse errors
-            }
-            throw new Error(message);
-        }
-
-        return res.json() as Promise<T>;
-    }
 
     const handleSignOut = () => {
         setError(null);
 
         startTransition(async () => {
             try {
-                const res = await fetch("/api/auth/logout", {
+                const res = await apiFetch("/api/auth/logout", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     credentials: "include",
@@ -280,7 +262,7 @@ export default function SidebarSettins({
                                 {(playersError as Error).message || "Nem sikerült betölteni a játékosokat"}
                             </div>
                         </div>
-                    ) : orderedPlayers.map((p, i) => (
+                    ) : orderedPlayers.map((p) => (
                         <div className={styles["pt-row"]} key={p.id}>
                             <div
                                 className={`${styles.avatar} ${styles.av36}`}
@@ -367,6 +349,7 @@ export default function SidebarSettins({
 
                 {/* ── Actions ── */}
                 <div className={styles.actions}>
+                    {error && <p className={styles["logout-error"]}>{error}</p>}
                     {/* <button
                         className={`${styles.btn} ${styles["btn-dark"]}`}
                         onClick={onClose}

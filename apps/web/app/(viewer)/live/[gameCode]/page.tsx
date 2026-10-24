@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import styles from "./live.module.css";
 
-// ── Types matching the SSE payload from Rust ──
+// ── Types matching the live state payload from Rust ──
 
 interface GameInfo {
   id: string;
@@ -35,7 +35,12 @@ interface GameState {
   scores: ScoreRow[];
 }
 
-type ConnectionStatus = "connecting" | "connected" | "disconnected";
+type ConnectionStatus = "connecting" | "connected" | "polling";
+
+// While the live stream is down, poll the read-only state endpoint instead.
+const POLL_MS = 5_000;
+const RECONNECT_MIN_MS = 3_000;
+const RECONNECT_MAX_MS = 30_000;
 
 export default function LiveViewerPage() {
   const searchParams = useSearchParams();
@@ -46,58 +51,62 @@ export default function LiveViewerPage() {
   const [error, setError] = useState<string | null>(null);
   const esRef = useRef<EventSource | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const reconnectDelay = useRef(RECONNECT_MIN_MS);
+
+  // Same-origin endpoints (app/api/live/*) — no direct connection to the API needed.
+  const base = token ? `/api/live/${encodeURIComponent(token)}` : null;
+
+  const loadState = useCallback(async () => {
+    if (!base) return;
+    try {
+      const res = await fetch(`${base}/state`, { cache: "no-store" });
+      if (res.status === 404) {
+        setError("A megosztás lejárt vagy ki lett kapcsolva.");
+        setState(null);
+        return;
+      }
+      if (!res.ok) return;
+      setState((await res.json()) as GameState);
+      setError(null);
+    } catch {
+      // offline — keep showing the last known state
+    }
+  }, [base]);
 
   const connect = useCallback(() => {
-    if (!token) return;
+    if (!base) return;
 
-    // Clean up previous connection
     esRef.current?.close();
     clearTimeout(reconnectTimer.current);
-    setStatus("connecting");
+    setStatus((prev) => (prev === "polling" ? prev : "connecting"));
 
-    // Connect directly to the Rust API for SSE streaming.
-    // Next.js rewrites buffer responses, which breaks SSE.
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
-    const es = new EventSource(`${apiUrl}/live/${token}/stream`);
+    const es = new EventSource(`${base}/stream`);
     esRef.current = es;
 
     es.addEventListener("init", (e) => {
       try {
-        const data: GameState = JSON.parse(e.data);
-        setState(data);
+        setState(JSON.parse((e as MessageEvent).data) as GameState);
         setStatus("connected");
         setError(null);
+        reconnectDelay.current = RECONNECT_MIN_MS;
       } catch {
-        setError("Hibas adat erkezett");
+        setError("Hibás adat érkezett");
       }
     });
 
-    es.addEventListener("update", (e) => {
-      try {
-        const event = JSON.parse(e.data);
-        // On any update event, refetch full state by reconnecting.
-        // This is simple and correct — the init event always sends full state.
-        if (
-          event.type === "scores_updated" ||
-          event.type === "game_closed" ||
-          event.type === "game_restarted"
-        ) {
-          es.close();
-          // Small delay to let the server process the change
-          reconnectTimer.current = setTimeout(connect, 300);
-        }
-      } catch {
-        // ignore parse errors
-      }
+    // Every update event means "something changed": fetch the fresh snapshot.
+    es.addEventListener("update", () => {
+      void loadState();
     });
 
     es.onerror = () => {
       es.close();
-      setStatus("disconnected");
-      // Auto-reconnect after 3 seconds
-      reconnectTimer.current = setTimeout(connect, 3000);
+      setStatus("polling");
+      void loadState();
+      reconnectTimer.current = setTimeout(connect, reconnectDelay.current);
+      reconnectDelay.current = Math.min(reconnectDelay.current * 2, RECONNECT_MAX_MS);
     };
-  }, [token]);
+  }, [base, loadState]);
 
   useEffect(() => {
     connect();
@@ -107,11 +116,29 @@ export default function LiveViewerPage() {
     };
   }, [connect]);
 
+  // Polling fallback while the stream is not connected.
+  useEffect(() => {
+    if (status === "connected" || !base) return;
+    const id = setInterval(() => void loadState(), POLL_MS);
+    return () => clearInterval(id);
+  }, [status, base, loadState]);
+
+  // Phones suspend background tabs: refresh immediately when the viewer comes back.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      void loadState();
+      if (esRef.current?.readyState !== EventSource.OPEN) connect();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [connect, loadState]);
+
   // ── Derived data ──
 
-  const players = state?.players ?? [];
-  const scores = state?.scores ?? [];
   const game = state?.game;
+  const players = useMemo(() => state?.players ?? [], [state]);
+  const scores = useMemo(() => state?.scores ?? [], [state]);
 
   // Group scores by round
   const rounds = useMemo(() => {
@@ -153,7 +180,7 @@ export default function LiveViewerPage() {
   if (!token) {
     return (
       <div className={styles["center-msg"]}>
-        <p>Ervenytelen megosztas link — hianyzo token.</p>
+        <p>Érvénytelen megosztási link — hiányzó token.</p>
       </div>
     );
   }
@@ -170,7 +197,7 @@ export default function LiveViewerPage() {
     return (
       <div className={styles["center-msg"]}>
         <Loader2 size={24} className={styles.spinner} />
-        <p>Csatlakozas...</p>
+        <p>Csatlakozás...</p>
       </div>
     );
   }
@@ -186,10 +213,10 @@ export default function LiveViewerPage() {
             <div className={styles["live-sub"]}>
               {game.winner_rule === "min" ? "Minimum nyer" : "Maximum nyer"}
               {" · "}
-              {rounds.length} kor
+              {rounds.length} kör
             </div>
             {game.status === "closed" && (
-              <span className={styles["game-closed-badge"]}>Lezart</span>
+              <span className={styles["game-closed-badge"]}>Lezárt — végeredmény</span>
             )}
           </>
         )}
@@ -204,71 +231,61 @@ export default function LiveViewerPage() {
               ? styles["status-connecting"]
               : styles["status-disconnected"]
         }`}
+        role="status"
       >
         <span className={styles["status-dot"]} />
         {status === "connected"
-          ? "Elo"
+          ? "Élő"
           : status === "connecting"
-            ? "Csatlakozas..."
-            : "Kapcsolodas..."}
+            ? "Csatlakozás..."
+            : "Újracsatlakozás... (frissítés 5 mp-enként)"}
       </div>
 
       {/* Score table */}
-      {players.length > 0 && (
-        <div className={styles["tbl-wrap"]}>
-          <div className={styles["scroll-hint"]}>
-            <table className={styles["score-tbl"]}>
-              <thead>
-                <tr>
-                  <th>Kor</th>
+      {players.length === 0 ? (
+        <p className={styles["empty-msg"]}>Még nincs pont rögzítve.</p>
+      ) : (
+        <div className={styles["tbl-wrap"]} data-table-scroll>
+          <table className={styles["score-tbl"]}>
+            <thead>
+              <tr>
+                <th>Kör</th>
+                {players.map((p) => (
+                  <th key={p.id}>{p.username}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {/* Totals row */}
+              <tr className={styles["total-row"]}>
+                <td>Össz.</td>
+                {players.map((p) => {
+                  const t = totals.get(p.id) ?? 0;
+                  const cls =
+                    p.id === winnerId
+                      ? styles["winner-col"]
+                      : p.id === loserId
+                        ? styles["loser-col"]
+                        : "";
+                  return (
+                    <td key={p.id} className={cls}>
+                      {t}
+                    </td>
+                  );
+                })}
+              </tr>
+
+              {/* Score rows */}
+              {rounds.map(([round, scoreMap]) => (
+                <tr key={round}>
+                  <td>{round}.</td>
                   {players.map((p) => (
-                    <th key={p.id}>{p.username}</th>
+                    <td key={p.id}>{scoreMap.get(p.id) ?? "—"}</td>
                   ))}
                 </tr>
-              </thead>
-              <tbody>
-                {/* Totals row */}
-                <tr className={styles["total-row"]}>
-                  <td>Ossz.</td>
-                  {players.map((p) => {
-                    const t = totals.get(p.id) ?? 0;
-                    const cls =
-                      p.id === winnerId
-                        ? styles["winner-col"]
-                        : p.id === loserId
-                          ? styles["loser-col"]
-                          : "";
-                    return (
-                      <td key={p.id} className={cls}>
-                        {t}
-                      </td>
-                    );
-                  })}
-                </tr>
-
-                {/* Score rows */}
-                {rounds.map(([round, scoreMap]) => (
-                  <tr key={round}>
-                    <td>{round}.</td>
-                    {players.map((p) => (
-                      <td key={p.id}>{scoreMap.get(p.id) ?? "—"}</td>
-                    ))}
-                  </tr>
-                ))}
-
-                {rounds.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={players.length + 1}
-                      style={{ textAlign: "center", padding: "24px", color: "var(--slate-400)" }}
-                    >
-                      Meg nincs pont
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

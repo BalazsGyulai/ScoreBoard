@@ -1,41 +1,14 @@
 import { cookies } from "next/headers";
-import type { Session } from "@/types/domain";
-
-const ACCESS_COOKIE = "hg_access_token";
-const REFRESH_COOKIE = "hg_refresh_token";
+import { ACCESS_COOKIE, decodeJwtPayload } from "./cookies";
 
 export async function getAccessToken(): Promise<string | undefined> {
     const jar = await cookies();
     return jar.get(ACCESS_COOKIE)?.value;
 }
 
-export async function setAuthCookies(
-    accessToken: string,
-    refreshToken: string,
-    accessMaxAge: number = 15 * 60,       // 15 minutes in seconds
-    refreshMaxAge: number = 7 * 24 * 3600, // 7 days in seconds
-) {
-    const jar = await cookies();
-
-    jar.set(ACCESS_COOKIE, accessToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        path: "/",
-        maxAge: accessMaxAge,
-    });
-
-    jar.set(REFRESH_COOKIE, refreshToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        path: "/",
-        maxAge: refreshMaxAge,
-    });
-}
-
-export async function clearAuthCookies() {
-    const jar = await cookies();
-    jar.delete(ACCESS_COOKIE);
-    jar.delete(REFRESH_COOKIE);
+/** User id of the caller, read from the access token (already verified by middleware/API). */
+export async function getCurrentUserId(): Promise<string | null> {
+    const token = await getAccessToken();
+    const sub = token ? decodeJwtPayload(token)?.sub : null;
+    return typeof sub === "string" ? sub : null;
 }

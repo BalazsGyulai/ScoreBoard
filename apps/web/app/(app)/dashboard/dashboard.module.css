@@ -20,7 +20,7 @@
 /* ── Stat cards grid ── */
 .stats4 {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 13px;
   margin-bottom: 22px;
 }
@@ -28,7 +28,7 @@
 /* ── 2-column layout ── */
 .dash2 {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
   margin-bottom: 16px;
 }
@@ -51,6 +51,8 @@
 
 .ovx {
   overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .section-hdr {
@@ -107,6 +109,10 @@
 
 .lb-name {
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-weight: 500;
   font-size: 14px;
 }
@@ -188,6 +194,14 @@
 
 .rg-info {
   flex: 1;
+  min-width: 0;
+}
+
+.rg-name,
+.rg-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .rg-name {
@@ -201,6 +215,10 @@
 }
 
 .rg-winner {
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 11.5px;
   font-weight: 600;
   color: #92400e;
@@ -235,8 +253,23 @@
 /* ── Head-to-head table ── */
 .hth-table {
   width: 100%;
-  border-collapse: collapse;
-  min-width: 480px;
+  border-collapse: separate;
+  border-spacing: 0;
+  min-width: 560px;
+}
+
+.hth-table th,
+.hth-table td {
+  white-space: nowrap;
+}
+
+/* player name stays visible while the numbers scroll */
+.hth-table th:first-child,
+.hth-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--card);
 }
 
 .hth-table th {
@@ -261,4 +294,61 @@
 
 .hth-table td:not(:first-child) {
   text-align: center;
+}
+
+/* ── Touch ── */
+@media (max-width: 1024px) {
+  .lb-row {
+    min-height: 54px;
+  }
+}
+
+/* ── Phone ── */
+@media (max-width: 640px) {
+  .p24 {
+    padding: 16px;
+  }
+
+  .lb-row {
+    gap: 8px;
+  }
+
+  .lb-bar-w {
+    width: 44px;
+  }
+
+  .hth-table th,
+  .hth-table td {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .stats4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dash2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .btn-ghost {
+    height: 44px;
+    padding: 0 14px;
+  }
+
+  .rg-row {
+    min-height: 54px;
+  }
+}
+
+@media (max-width: 640px) {
+  .stats4 {
+    gap: 10px;
+  }
+
+  .dash-top {
+    margin-bottom: 18px;
+  }
 }

@@ -38,9 +38,15 @@
   flex-wrap: wrap;
 }
 
-/* ── Table wrapper ── */
-.scroll-hint {
+/* ── Table wrapper ──
+   .tbl-wrap is the card (rounded, clips its own corners); .tbl-scroll inside it
+   is the horizontal scroll container. The table must never sit directly inside
+   an overflow:hidden box — that clips it, so it cannot be scrolled, and makes
+   the sticky first column stick to the wrong box. */
+.tbl-scroll {
   overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .tbl-wrap {
@@ -53,8 +59,15 @@
 
 .score-tbl {
   width: 100%;
-  border-collapse: collapse;
-  min-width: 640px;
+  /* separate (not collapse): sticky cells keep their borders while scrolling */
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.score-tbl th,
+.score-tbl td {
+  min-width: 84px;
+  white-space: nowrap;
 }
 
 /* Sticky first column */
@@ -65,7 +78,8 @@
   background: var(--card);
   z-index: 2;
   text-align: left;
-  min-width: 72px;
+  min-width: 76px;
+  box-shadow: 1px 0 0 var(--slate-200);
 }
 
 .score-tbl .total-row td:first-child {
@@ -97,11 +111,8 @@
 }
 
 /* ── Total row ── */
-.total-row {
-  background: var(--slate-100);
-}
-
 .total-row td {
+  background: var(--slate-100);
   padding: 15px 14px;
   font-family: "Bricolage Grotesque", sans-serif;
   font-size: 20px;
@@ -129,11 +140,11 @@
 }
 
 /* ── Data rows ── */
-.score-tbl tbody tr:not(.total-row):not(.input-row) {
+.score-tbl tbody tr:not(.total-row):not(.input-row) td {
   border-bottom: 1px solid var(--slate-100);
 }
 
-.score-tbl tbody tr:not(.total-row):not(.input-row):hover {
+.score-tbl tbody tr:not(.total-row):not(.input-row):hover td {
   background: #fafbfc;
 }
 
@@ -158,6 +169,13 @@
   display: inline-block;
   min-width: 34px;
   transition: background var(--t) var(--ease);
+}
+
+.cell-btn {
+  border: none;
+  background: transparent;
+  font: inherit;
+  color: inherit;
 }
 
 .cell-val:hover {
@@ -203,11 +221,8 @@ tr:hover .del-btn {
 }
 
 /* ── Input row ── */
-.input-row {
-  background: #fffbeb;
-}
-
 .input-row td {
+  background: #fffbeb;
   padding: 12px 10px;
   text-align: center;
 }
@@ -247,6 +262,8 @@ tr:hover .del-btn {
 /* ── Footer ── */
 .tbl-foot {
   display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
   align-items: center;
   justify-content: space-between;
   padding: 14px 20px;
@@ -267,7 +284,7 @@ tr:hover .del-btn {
   position: fixed;
   top: 0;
   left: 0;
-  width: 100vw;
+  width: 100%;
   height: 100dvh;
   background: rgba(15, 23, 42, 0.4);
   display: grid;
@@ -305,4 +322,84 @@ tr:hover .del-btn {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+
+.tbl-foot-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ── Touch: 44px tap targets ── */
+@media (max-width: 1024px) {
+  .game-pg-hdr-left .back {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    font-size: 14px;
+  }
+
+  .cell-val {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .round-inp,
+  .cell-edit {
+    width: 64px;
+    height: 44px;
+  }
+
+  .score-tbl tbody td {
+    padding: 4px 10px;
+  }
+}
+
+/* ── Phone ── */
+@media (max-width: 640px) {
+  .game-pg-hdr {
+    margin-bottom: 16px;
+  }
+
+  .game-actions {
+    width: 100%;
+  }
+
+  .game-actions > * {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .score-tbl thead th {
+    padding: 14px 10px;
+  }
+
+  .total-row td {
+    padding: 12px 10px;
+    font-size: 18px;
+  }
+
+  .tbl-foot {
+    padding: 12px;
+  }
+
+  .tbl-foot-actions {
+    width: 100%;
+  }
+
+  .tbl-foot-actions > * {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .confirm-overlay {
+    padding: 16px;
+  }
+
+  .confirm-actions > * {
+    flex: 1;
+    justify-content: center;
+  }
 }

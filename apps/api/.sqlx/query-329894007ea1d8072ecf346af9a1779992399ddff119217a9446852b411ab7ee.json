@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM refresh_tokens\n           WHERE user_id = $1\n             AND (expires_at < NOW()\n                  OR revoked_at < NOW() - INTERVAL '1 day'\n                  OR rotated_at < NOW() - INTERVAL '7 days')",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "329894007ea1d8072ecf346af9a1779992399ddff119217a9446852b411ab7ee"
+}
