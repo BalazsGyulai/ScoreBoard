@@ -59,7 +59,12 @@ pub async fn leaderboard(auth: AuthUser, State(state): State<AppState>) -> Respo
     }
 }
 
-// GET /stats/history — per-snapshot placements for trend/streak calculations
+// GET /stats/history — one row per player per finished match (snapshot).
+//
+// The match date is the snapshot's own time (game_results.created_at), not
+// games.closed_at: that column only holds the *latest* close of a game and is reset
+// to NULL by a restart, which used to (a) drop every match of a restarted game from
+// the history and (b) date all earlier matches of a game with its latest match.
 pub async fn history(auth: AuthUser, State(state): State<AppState>) -> Response {
     let result = sqlx::query!(
         r#"
@@ -68,12 +73,22 @@ pub async fn history(auth: AuthUser, State(state): State<AppState>) -> Response 
             gr.game_id,
             gr.user_id,
             gr.place,
-            g.closed_at
+            gr.total_score,
+            gr.created_at AS played_at,
+            g.winner_rule,
+            a.rounds_played AS "rounds_played!",
+            a.best_round
         FROM game_results gr
         JOIN games g ON g.id = gr.game_id
+        LEFT JOIN LATERAL (
+            SELECT
+                COUNT(*) AS rounds_played,
+                CASE WHEN g.winner_rule = 'min' THEN MIN(sa.value) ELSE MAX(sa.value) END AS best_round
+            FROM score_archives sa
+            WHERE sa.snapshot_id = gr.snapshot_id AND sa.user_id = gr.user_id
+        ) a ON TRUE
         WHERE g.group_id = $1
-          AND g.closed_at IS NOT NULL
-        ORDER BY g.closed_at ASC, gr.snapshot_id ASC, gr.user_id ASC
+        ORDER BY gr.created_at ASC, gr.snapshot_id ASC, gr.user_id ASC
         "#,
         auth.group_id,
     )
@@ -84,12 +99,20 @@ pub async fn history(auth: AuthUser, State(state): State<AppState>) -> Response 
         Ok(rows) => {
             let placements: Vec<PlayerPlacement> = rows
                 .into_iter()
-                .map(|r| PlayerPlacement {
-                    snapshot_id: r.snapshot_id,
-                    game_id: r.game_id,
-                    user_id: r.user_id,
-                    place: r.place,
-                    closed_at: r.closed_at.expect("closed_at filtered by query").to_rfc3339(),
+                .map(|r| {
+                    let played_at = r.played_at.to_rfc3339();
+                    PlayerPlacement {
+                        snapshot_id: r.snapshot_id,
+                        game_id: r.game_id,
+                        user_id: r.user_id,
+                        place: r.place,
+                        total_score: r.total_score,
+                        rounds_played: r.rounds_played,
+                        best_round: r.best_round,
+                        winner_rule: r.winner_rule,
+                        closed_at: played_at.clone(),
+                        played_at,
+                    }
                 })
                 .collect();
             Json(placements).into_response()

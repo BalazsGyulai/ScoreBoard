@@ -352,3 +352,9 @@
     margin-bottom: 18px;
   }
 }
+
+/* open game in the recent list: current leader, not a final winner */
+.rg-live {
+  background: var(--slate-100);
+  color: var(--slate-700);
+}

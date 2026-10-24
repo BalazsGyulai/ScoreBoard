@@ -525,3 +525,39 @@
         min-height: 48px;
     }
 }
+
+/* ── Account row ── */
+.account-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    border-radius: var(--radius-sm);
+    background: var(--slate-100);
+}
+
+.account-role {
+    display: block;
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--slate-500);
+}
+
+.account-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--slate-900);
+    text-align: right;
+}
+
+.s-hint {
+    font-size: 12px;
+    color: var(--slate-500);
+    margin: -4px 0 8px;
+    line-height: 1.4;
+}

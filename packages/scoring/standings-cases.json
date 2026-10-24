@@ -1,0 +1,150 @@
+{
+  "$comment": "Shared test vectors for the standings rule. Used by apps/api/src/scoring.rs (cargo test) and apps/web/lib/scoring (vitest), so the official close result and the live screens can never disagree. scores: [player, round, value]. expected: ordered by place, then player.",
+  "cases": [
+    {
+      "name": "max game: highest total wins",
+      "winner_rule": "max",
+      "scores": [["anna", 1, 10], ["bela", 1, 4], ["anna", 2, 3], ["bela", 2, 12]],
+      "expected": [
+        { "player": "bela", "total": 16, "rounds": 2, "place": 1 },
+        { "player": "anna", "total": 13, "rounds": 2, "place": 2 }
+      ],
+      "winners": ["bela"],
+      "losers": ["anna"]
+    },
+    {
+      "name": "min game: lowest total wins, negative scores allowed",
+      "winner_rule": "min",
+      "scores": [["anna", 1, -5], ["bela", 1, 8], ["cili", 1, 2], ["anna", 2, 3], ["bela", 2, -2], ["cili", 2, 0]],
+      "expected": [
+        { "player": "anna", "total": -2, "rounds": 2, "place": 1 },
+        { "player": "cili", "total": 2, "rounds": 2, "place": 2 },
+        { "player": "bela", "total": 6, "rounds": 2, "place": 3 }
+      ],
+      "winners": ["anna"],
+      "losers": ["bela"]
+    },
+    {
+      "name": "tie for first: both win, next place is 3",
+      "winner_rule": "max",
+      "scores": [["anna", 1, 10], ["bela", 1, 10], ["cili", 1, 7]],
+      "expected": [
+        { "player": "anna", "total": 10, "rounds": 1, "place": 1 },
+        { "player": "bela", "total": 10, "rounds": 1, "place": 1 },
+        { "player": "cili", "total": 7, "rounds": 1, "place": 3 }
+      ],
+      "winners": ["anna", "bela"],
+      "losers": ["cili"]
+    },
+    {
+      "name": "tie for last: both lose",
+      "winner_rule": "min",
+      "scores": [["anna", 1, 1], ["bela", 1, 9], ["cili", 1, 9]],
+      "expected": [
+        { "player": "anna", "total": 1, "rounds": 1, "place": 1 },
+        { "player": "bela", "total": 9, "rounds": 1, "place": 2 },
+        { "player": "cili", "total": 9, "rounds": 1, "place": 2 }
+      ],
+      "winners": ["anna"],
+      "losers": ["bela", "cili"]
+    },
+    {
+      "name": "everyone tied: all win, nobody loses",
+      "winner_rule": "max",
+      "scores": [["anna", 1, 5], ["bela", 1, 5]],
+      "expected": [
+        { "player": "anna", "total": 5, "rounds": 1, "place": 1 },
+        { "player": "bela", "total": 5, "rounds": 1, "place": 1 }
+      ],
+      "winners": ["anna", "bela"],
+      "losers": []
+    },
+    {
+      "name": "min game: skipping a round does not win (was: missing round = 0 points)",
+      "winner_rule": "min",
+      "scores": [["anna", 1, 5], ["bela", 1, 6], ["cili", 1, 7], ["anna", 2, 5], ["bela", 2, 6], ["anna", 3, 5], ["bela", 3, 6], ["cili", 3, 1]],
+      "expected": [
+        { "player": "anna", "total": 15, "rounds": 3, "place": 1 },
+        { "player": "bela", "total": 18, "rounds": 3, "place": 2 },
+        { "player": "cili", "total": 8, "rounds": 2, "place": 3 }
+      ],
+      "winners": ["anna"],
+      "losers": ["cili"]
+    },
+    {
+      "name": "max game: a player with a missing round ranks after complete players",
+      "winner_rule": "max",
+      "scores": [["anna", 1, 20], ["bela", 1, 1], ["anna", 2, 20], ["bela", 2, 1], ["cili", 2, 1]],
+      "expected": [
+        { "player": "anna", "total": 40, "rounds": 2, "place": 1 },
+        { "player": "bela", "total": 2, "rounds": 2, "place": 2 },
+        { "player": "cili", "total": 1, "rounds": 1, "place": 3 }
+      ],
+      "winners": ["anna"],
+      "losers": ["cili"]
+    },
+    {
+      "name": "late joiner (missed the first two rounds) cannot win a min game",
+      "winner_rule": "min",
+      "scores": [["anna", 1, 4], ["bela", 1, 5], ["anna", 2, 4], ["bela", 2, 5], ["anna", 3, 4], ["bela", 3, 5], ["dani", 3, 0]],
+      "expected": [
+        { "player": "anna", "total": 12, "rounds": 3, "place": 1 },
+        { "player": "bela", "total": 15, "rounds": 3, "place": 2 },
+        { "player": "dani", "total": 0, "rounds": 1, "place": 3 }
+      ],
+      "winners": ["anna"],
+      "losers": ["dani"]
+    },
+    {
+      "name": "everyone missed one round: equal rounds, totals decide",
+      "winner_rule": "min",
+      "scores": [["anna", 1, 3], ["bela", 1, 2], ["bela", 2, 2], ["cili", 2, 9], ["anna", 3, 3], ["cili", 3, 1]],
+      "expected": [
+        { "player": "bela", "total": 4, "rounds": 2, "place": 1 },
+        { "player": "anna", "total": 6, "rounds": 2, "place": 2 },
+        { "player": "cili", "total": 10, "rounds": 2, "place": 3 }
+      ],
+      "winners": ["bela"],
+      "losers": ["cili"]
+    },
+    {
+      "name": "tie between two incomplete players",
+      "winner_rule": "max",
+      "scores": [["anna", 1, 9], ["anna", 2, 9], ["bela", 1, 4], ["cili", 2, 4]],
+      "expected": [
+        { "player": "anna", "total": 18, "rounds": 2, "place": 1 },
+        { "player": "bela", "total": 4, "rounds": 1, "place": 2 },
+        { "player": "cili", "total": 4, "rounds": 1, "place": 2 }
+      ],
+      "winners": ["anna"],
+      "losers": ["bela", "cili"]
+    },
+    {
+      "name": "single participant wins and does not lose",
+      "winner_rule": "min",
+      "scores": [["anna", 1, 7]],
+      "expected": [{ "player": "anna", "total": 7, "rounds": 1, "place": 1 }],
+      "winners": ["anna"],
+      "losers": []
+    },
+    {
+      "name": "no scores: nobody is ranked (players without scores are not participants)",
+      "winner_rule": "min",
+      "scores": [],
+      "expected": [],
+      "winners": [],
+      "losers": []
+    },
+    {
+      "name": "zero total is a real score, not 'no score'",
+      "winner_rule": "min",
+      "scores": [["anna", 1, 0], ["bela", 1, 3]],
+      "expected": [
+        { "player": "anna", "total": 0, "rounds": 1, "place": 1 },
+        { "player": "bela", "total": 3, "rounds": 1, "place": 2 }
+      ],
+      "winners": ["anna"],
+      "losers": ["bela"]
+    }
+  ]
+}

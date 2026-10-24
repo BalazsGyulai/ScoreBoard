@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM score_drafts WHERE game_id = $1 AND user_id = $2 AND round = $3",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f2213e57a083b7657c834770dd2925037d59922772fe5b9afb2b4392aca8da7a"
+}

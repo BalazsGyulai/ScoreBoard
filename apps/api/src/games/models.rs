@@ -28,6 +28,7 @@ pub struct GameResult {
     pub user_id: Uuid,
     pub username: String,
     pub total_score: i64,
+    pub rounds_played: i32,
     pub place: i32,
 }
 

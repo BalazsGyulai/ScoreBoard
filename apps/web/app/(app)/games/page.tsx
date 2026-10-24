@@ -42,7 +42,10 @@ export default function GamesPage() {
                         Még nincs játék. Hozz létre egyet a + gombbal.
                     </div>
                 ) : (
-                    games.map((g) => (
+                    // games in progress first, then alphabetical
+                    [...games]
+                        .sort((a, b) => (a.status === b.status ? a.name.localeCompare(b.name, "hu") : a.status === "open" ? -1 : 1))
+                        .map((g) => (
                         <Link
                             href={`/games/${encodeURIComponent(g.name.toLowerCase())}`}
                             key={g.id}
@@ -51,8 +54,12 @@ export default function GamesPage() {
                             <div className={styles["game-card-icon"]}>{g.icon}</div>
                             <h3>{g.name}</h3>
                             <div className={styles["gc-meta"]}>
-                                Kör: {g.current_round} · Szabály:{" "}
-                                {g.winner_rule === "min" ? "Minimum" : "Maximum"}
+                                {g.status === "open"
+                                    ? g.current_round > 1
+                                        ? `${g.current_round - 1} kör lejátszva`
+                                        : "Még nincs kör"
+                                    : "Lezárva"}{" "}
+                                · {g.winner_rule === "min" ? "kevesebb nyer" : "több nyer"}
                             </div>
                             <span className={`${styles.badge} ${g.status === "closed" ? styles["badge-green"] : styles["badge-amber"]}`}>
                                 {g.status === "closed" ? "✓ Lezárt" : "● Aktív"}

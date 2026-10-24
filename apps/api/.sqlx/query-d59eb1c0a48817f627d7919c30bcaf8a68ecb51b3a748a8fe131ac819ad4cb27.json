@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO scores (id, game_id, user_id, round, value)\n           VALUES ($1, $2, $3, $4, $5)\n           ON CONFLICT ON CONSTRAINT scores_one_per_player_round\n           DO UPDATE SET value = EXCLUDED.value\n           RETURNING id, value",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "value",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Int4",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "d59eb1c0a48817f627d7919c30bcaf8a68ecb51b3a748a8fe131ac819ad4cb27"
+}

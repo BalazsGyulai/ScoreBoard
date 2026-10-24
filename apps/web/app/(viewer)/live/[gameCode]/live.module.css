@@ -225,3 +225,30 @@
   color: var(--slate-700);
   margin-top: 8px;
 }
+
+.live-leader {
+  margin-top: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--orange-dk);
+}
+
+.place-note {
+  display: block;
+  margin-top: 2px;
+  font-family: "DM Sans", sans-serif;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--slate-500);
+}
+
+.standings-wrap {
+  width: 100%;
+  max-width: 900px;
+  margin-bottom: 16px;
+}
+
+.standings-wrap > section {
+  margin-top: 0;
+}

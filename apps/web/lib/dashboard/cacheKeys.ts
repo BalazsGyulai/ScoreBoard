@@ -1,10 +1,6 @@
-export const dashboardCacheKeys = [
-  "/api/dashboard/win-rate",
-  "/api/dashboard/total-matches",
-  "/api/dashboard/best-game",
-  "/api/dashboard/most-active",
-  "/api/dashboard/leaderboard",
-  "/api/dashboard/recent-games",
-  "/api/dashboard/summary-table",
-  "/api/dashboard/header",
-] as const;
+import { mutate } from "swr";
+
+/** Refetch every stats view (dashboard, stats page, player pages) after a result changed. */
+export function revalidateStats() {
+  return mutate((key) => typeof key === "string" && key.startsWith("/api/dashboard/"));
+}
