@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { serverFetch } from "@/lib/api/server";
+import { errorResponse, serverFetch } from "@/lib/api/server";
 import type { ApiGame, ApiScoreRow } from "@/types/api";
 
 type WinnerRule = "min" | "max";
@@ -53,7 +53,6 @@ export async function GET() {
 
     return NextResponse.json(items);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Nem sikerült betölteni";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse(error);
   }
 }

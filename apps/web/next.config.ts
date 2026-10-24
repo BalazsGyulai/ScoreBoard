@@ -21,7 +21,8 @@ const nextConfig: NextConfig = {
     API_URL: process.env.API_URL ?? "http://localhost:8080",
   },
 
-  // Rewrites let the browser call /api/sse/... without knowing the Rust server's address.
+  // Rewrites let the browser call /api/... without knowing the Rust server's address.
+  // (/api/live/* is served by route handlers so the SSE stream is not buffered.)
   // The Next.js server proxies it internally — the Rust URL never leaks to the client.
   async rewrites() {
     const API_URL = process.env.API_URL ?? "http://localhost:8080";
@@ -60,10 +61,6 @@ const nextConfig: NextConfig = {
       {
         source: "/api/games/:id/share",
         destination: `${API_URL}/games/:id/share`,
-      },
-      {
-        source: "/api/live/:token/stream",
-        destination: `${API_URL}/live/:token/stream`,
       },
     ];
   },

@@ -1,3 +1,4 @@
+import { copySetCookies } from "@/lib/auth/cookies";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
@@ -28,16 +29,6 @@ export async function POST(request: Request) {
 
     
     const response = NextResponse.json(data, { status: rustRes.status });
-    const isProduction = process.env.NODE_ENV === "production";
-
-    
-    const cookies = rustRes.headers.getSetCookie();
-    cookies.forEach((cookie) => {
-        // strip "Ssecure" flag because localhost is HTTP
-        const cleaned = isProduction ? cookie : cookie.replace(/;\s*Secure/gi, "");
-        
-        response.headers.append("Set-Cookie", cleaned);
-    });
-
+    copySetCookies(rustRes, response);
     return response;
 }

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { serverFetch } from "@/lib/api/server";
+import { errorResponse, serverFetch } from "@/lib/api/server";
 import type { ApiGame } from "@/types/api";
 
 interface ApiPlacement {
@@ -23,7 +23,6 @@ export async function GET() {
       subLabel: `${distinctGames} kulonbozo jatek`,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Nem sikerült betölteni";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse(error);
   }
 }

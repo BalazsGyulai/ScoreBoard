@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { serverFetch } from "@/lib/api/server";
+import { errorResponse, serverFetch } from "@/lib/api/server";
 
 interface ApiPlacement {
   closed_at: string;
@@ -16,7 +16,6 @@ export async function GET() {
 
     return NextResponse.json(years);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Nem sikerült betölteni";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse(error);
   }
 }
