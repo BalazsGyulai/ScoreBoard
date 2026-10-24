@@ -67,6 +67,15 @@ pub fn build(state: AppState) -> Router {
             "/games/{id}/score-snapshots",
             get(scores::handlers::get_score_snapshots),
         )
+        .route(
+            "/games/{id}/scores/{round}/{player_id}",
+            axum::routing::put(scores::handlers::set_round_score),
+        )
+        .route("/games/{id}/rounds/last", delete(scores::handlers::delete_last_round))
+        .route(
+            "/games/{id}/drafts",
+            get(scores::drafts::get_drafts).put(scores::drafts::save_drafts),
+        )
         .route("/scores/{id}", axum::routing::put(scores::handlers::update_score))
 
         // ── Stats ─────────────────────────────────────────────────────────────

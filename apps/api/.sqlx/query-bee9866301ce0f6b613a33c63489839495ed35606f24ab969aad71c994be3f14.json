@@ -1,0 +1,70 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            gr.snapshot_id,\n            gr.game_id,\n            gr.user_id,\n            gr.place,\n            gr.total_score,\n            gr.created_at AS played_at,\n            g.winner_rule,\n            a.rounds_played AS \"rounds_played!\",\n            a.best_round\n        FROM game_results gr\n        JOIN games g ON g.id = gr.game_id\n        LEFT JOIN LATERAL (\n            SELECT\n                COUNT(*) AS rounds_played,\n                CASE WHEN g.winner_rule = 'min' THEN MIN(sa.value) ELSE MAX(sa.value) END AS best_round\n            FROM score_archives sa\n            WHERE sa.snapshot_id = gr.snapshot_id AND sa.user_id = gr.user_id\n        ) a ON TRUE\n        WHERE g.group_id = $1\n        ORDER BY gr.created_at ASC, gr.snapshot_id ASC, gr.user_id ASC\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "snapshot_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "game_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "place",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 4,
+        "name": "total_score",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 5,
+        "name": "played_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 6,
+        "name": "winner_rule",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "rounds_played!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 8,
+        "name": "best_round",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "bee9866301ce0f6b613a33c63489839495ed35606f24ab969aad71c994be3f14"
+}

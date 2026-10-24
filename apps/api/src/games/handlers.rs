@@ -6,8 +6,15 @@ use axum::{
 };
 use uuid::Uuid;
 
+use std::collections::HashMap;
+
 use super::models::{CloseGameResponse, CreateGameRequest, Game, GameResult};
-use crate::{auth::middleware::AuthUser, sse::broadcaster::GameEvent, AppState};
+use crate::{
+    auth::middleware::AuthUser,
+    scoring::{standings, WinnerRule},
+    sse::broadcaster::GameEvent,
+    AppState,
+};
 
 fn is_leader(role: &str) -> bool {
     role == "leader"
@@ -152,50 +159,41 @@ pub async fn close_game(
         return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": "Game is already closed" }))).into_response();
     }
 
-    // Aggregate scores per player
-    let totals = sqlx::query!(
-        r#"SELECT s.user_id, u.username, COALESCE(SUM(s.value), 0) AS "total!"
+    // Every score of the session; standings follow the shared rule in crate::scoring.
+    let rows = sqlx::query!(
+        r#"SELECT s.user_id, u.username, s.round, s.value
            FROM scores s
            JOIN users u ON u.id = s.user_id
-           WHERE s.game_id = $1
-           GROUP BY s.user_id, u.username
-           ORDER BY u.username"#,
+           WHERE s.game_id = $1"#,
         game_id,
     )
     .fetch_all(&state.db)
     .await;
 
-    let mut totals = match totals {
+    let rows = match rows {
         Ok(rows) => rows,
         Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     };
 
-    if totals.is_empty() {
+    if rows.is_empty() {
         return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": "No scores recorded — cannot close an empty game" }))).into_response();
     }
 
-    // Sort by total based on winner_rule
-    if game.winner_rule == "min" {
-        totals.sort_by_key(|r| r.total);
-    } else {
-        totals.sort_by_key(|r| std::cmp::Reverse(r.total));
-    }
+    let usernames: HashMap<Uuid, String> = rows.iter().map(|r| (r.user_id, r.username.clone())).collect();
+    let entries: Vec<(Uuid, i32, i64)> = rows.iter().map(|r| (r.user_id, r.round, r.value as i64)).collect();
+    let ranked = standings(&entries, WinnerRule::parse(&game.winner_rule));
 
-    // Assign places with ties (same total = same place, next place = position)
-    let mut results: Vec<GameResult> = Vec::with_capacity(totals.len());
-    for (i, row) in totals.iter().enumerate() {
-        let place = if i == 0 {
-            1
-        } else if row.total == totals[i - 1].total {
-            results[i - 1].place // same total → same place
-        } else {
-            (i + 1) as i32 // skip to position
+    let mut results: Vec<GameResult> = Vec::with_capacity(ranked.len());
+    for s in ranked {
+        let Ok(total_score) = i32::try_from(s.total) else {
+            return (StatusCode::UNPROCESSABLE_ENTITY, Json(serde_json::json!({ "error": "Total score out of range" }))).into_response();
         };
         results.push(GameResult {
-            user_id: row.user_id,
-            username: row.username.clone(),
-            total_score: row.total,
-            place,
+            user_id: s.player,
+            username: usernames.get(&s.player).cloned().unwrap_or_default(),
+            total_score: total_score as i64,
+            rounds_played: s.rounds_played,
+            place: s.place,
         });
     }
 
@@ -249,6 +247,10 @@ pub async fn close_game(
         if res.is_err() {
             return StatusCode::INTERNAL_SERVER_ERROR.into_response();
         }
+    }
+
+    if crate::scores::drafts::clear(&mut *tx, game_id).await.is_err() {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
 
     let update = sqlx::query!(
@@ -310,6 +312,10 @@ pub async fn restart_game(
         .await
         .is_err()
     {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    }
+
+    if crate::scores::drafts::clear(&mut *tx, game_id).await.is_err() {
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
 

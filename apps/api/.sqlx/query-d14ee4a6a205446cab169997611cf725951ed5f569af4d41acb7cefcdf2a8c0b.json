@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE games SET current_round = current_round + 1 WHERE id = $1",
+  "query": "DELETE FROM score_drafts WHERE game_id = $1",
   "describe": {
     "columns": [],
     "parameters": {
@@ -10,5 +10,5 @@
     },
     "nullable": []
   },
-  "hash": "062633d752433a4a3c9ffde12b1fe9b0a226f07a63c19c989664bcd80b4c8d20"
+  "hash": "d14ee4a6a205446cab169997611cf725951ed5f569af4d41acb7cefcdf2a8c0b"
 }

@@ -5,6 +5,7 @@ pub mod grpc;
 pub mod players;
 pub mod router;
 pub mod scores;
+pub mod scoring;
 pub mod stats;
 pub mod db;
 pub mod sse;

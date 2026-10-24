@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT s.user_id, u.username, COALESCE(SUM(s.value), 0) AS \"total!\"\n           FROM scores s\n           JOIN users u ON u.id = s.user_id\n           WHERE s.game_id = $1\n           GROUP BY s.user_id, u.username\n           ORDER BY u.username",
+  "query": "SELECT s.user_id, u.username, s.round, s.value\n           FROM scores s\n           JOIN users u ON u.id = s.user_id\n           WHERE s.game_id = $1",
   "describe": {
     "columns": [
       {
@@ -15,8 +15,13 @@
       },
       {
         "ordinal": 2,
-        "name": "total!",
-        "type_info": "Int8"
+        "name": "round",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 3,
+        "name": "value",
+        "type_info": "Int4"
       }
     ],
     "parameters": {
@@ -27,8 +32,9 @@
     "nullable": [
       false,
       false,
-      null
+      false,
+      false
     ]
   },
-  "hash": "e6864fafeb1c2e755454bd9a1556b6ed1d2cdb4a0e39aa691ff66680a64f788a"
+  "hash": "34c6ef576bb6d586cbd82244603e31dc9b083cf9081e39a14cb70de54c610d7e"
 }

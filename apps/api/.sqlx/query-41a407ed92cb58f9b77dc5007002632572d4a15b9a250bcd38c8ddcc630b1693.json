@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE games SET current_round = current_round + 1\n           WHERE id = $1 AND group_id = $2 AND status = 'open'\n           RETURNING current_round - 1 AS \"round!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "round!",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "41a407ed92cb58f9b77dc5007002632572d4a15b9a250bcd38c8ddcc630b1693"
+}

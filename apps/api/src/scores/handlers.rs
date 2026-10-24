@@ -13,6 +13,28 @@ fn is_leader(role: &str) -> bool {
     role == "leader"
 }
 
+/// A single round score must stay within this range, so session totals always fit
+/// the stored INT column (and typos like 5000000 are caught).
+const MAX_ABS_SCORE: i32 = 1_000_000;
+
+fn score_out_of_range() -> Response {
+    (
+        StatusCode::BAD_REQUEST,
+        Json(serde_json::json!({ "error": format!("Score must be between -{MAX_ABS_SCORE} and {MAX_ABS_SCORE}") })),
+    )
+        .into_response()
+}
+
+async fn is_group_member(state: &AppState, group_id: Uuid, user_id: Uuid) -> Result<bool, sqlx::Error> {
+    sqlx::query_scalar!(
+        r#"SELECT EXISTS(SELECT 1 FROM users WHERE id = $1 AND group_id = $2) AS "exists!""#,
+        user_id,
+        group_id,
+    )
+    .fetch_one(&state.db)
+    .await
+}
+
 // GET /games/:id/scores — all scores grouped by round
 pub async fn get_scores(
     auth: AuthUser,
@@ -130,6 +152,9 @@ pub async fn add_round(
     if body.scores.is_empty() {
         return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": "No scores provided" }))).into_response();
     }
+    if body.scores.iter().any(|s| s.value.abs() > MAX_ABS_SCORE) {
+        return score_out_of_range();
+    }
 
     // Fetch game and verify ownership
     let game = sqlx::query!(
@@ -140,14 +165,14 @@ pub async fn add_round(
     .fetch_optional(&state.db)
     .await;
 
-    let current_round = match game {
+    match game {
         Ok(Some(g)) if g.status == "closed" => {
             return (StatusCode::CONFLICT, Json(serde_json::json!({ "error": "Game is closed" }))).into_response();
         }
-        Ok(Some(g)) => g.current_round,
+        Ok(Some(_)) => {}
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
         Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
-    };
+    }
 
     // Every player must be a member of the caller's group — otherwise a leader could
     // attach scores (and expose usernames) of users from another group.
@@ -177,11 +202,33 @@ pub async fn add_round(
         Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     };
 
+    // Claim the round number atomically: two phones saving at the same moment get
+    // rounds N and N+1 instead of both writing round N (unique violation → 500).
+    let claimed = sqlx::query_scalar!(
+        r#"UPDATE games SET current_round = current_round + 1
+           WHERE id = $1 AND group_id = $2 AND status = 'open'
+           RETURNING current_round - 1 AS "round!""#,
+        game_id,
+        auth.group_id,
+    )
+    .fetch_optional(&mut *tx)
+    .await;
+
+    let current_round = match claimed {
+        Ok(Some(round)) => round,
+        Ok(None) => return (StatusCode::CONFLICT, Json(serde_json::json!({ "error": "Game is closed" }))).into_response(),
+        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    };
+
+    // The round is saved: its drafts are done.
+    if super::drafts::clear(&mut *tx, game_id).await.is_err() {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    }
+
     for ps in &body.scores {
-        let score_id = Uuid::new_v4();
         let res = sqlx::query!(
             "INSERT INTO scores (id, game_id, user_id, round, value) VALUES ($1, $2, $3, $4, $5)",
-            score_id,
+            Uuid::new_v4(),
             game_id,
             ps.player_id,
             current_round,
@@ -193,18 +240,6 @@ pub async fn add_round(
         if res.is_err() {
             return StatusCode::INTERNAL_SERVER_ERROR.into_response();
         }
-    }
-
-    // Advance the round counter
-    let update = sqlx::query!(
-        "UPDATE games SET current_round = current_round + 1 WHERE id = $1",
-        game_id,
-    )
-    .execute(&mut *tx)
-    .await;
-
-    if update.is_err() {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
 
     if tx.commit().await.is_err() {
@@ -225,6 +260,9 @@ pub async fn update_score(
 ) -> Response {
     if !is_leader(&auth.role) {
         return (StatusCode::FORBIDDEN, Json(serde_json::json!({ "error": "Only the leader can update scores" }))).into_response();
+    }
+    if body.value.abs() > MAX_ABS_SCORE {
+        return score_out_of_range();
     }
 
     // Ensure this score belongs to a game in the caller's group.
@@ -254,4 +292,129 @@ pub async fn update_score(
         Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "Score not found or access denied" }))).into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
+}
+
+// PUT /games/:id/scores/:round/:player_id — set (or fill in a missing) score of an
+// already played round of an open game.
+pub async fn set_round_score(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path((game_id, round, player_id)): Path<(Uuid, i32, Uuid)>,
+    Json(body): Json<UpdateScoreRequest>,
+) -> Response {
+    if !is_leader(&auth.role) {
+        return (StatusCode::FORBIDDEN, Json(serde_json::json!({ "error": "Only the leader can update scores" }))).into_response();
+    }
+    if body.value.abs() > MAX_ABS_SCORE {
+        return score_out_of_range();
+    }
+
+    let game = sqlx::query!(
+        r#"SELECT current_round, status::TEXT AS "status!" FROM games WHERE id = $1 AND group_id = $2"#,
+        game_id,
+        auth.group_id,
+    )
+    .fetch_optional(&state.db)
+    .await;
+
+    match game {
+        Ok(Some(g)) if g.status == "closed" => {
+            return (StatusCode::CONFLICT, Json(serde_json::json!({ "error": "Game is closed" }))).into_response();
+        }
+        Ok(Some(g)) if round < 1 || round >= g.current_round => {
+            return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": "This round has not been played yet" }))).into_response();
+        }
+        Ok(Some(_)) => {}
+        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
+        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
+
+    match is_group_member(&state, auth.group_id, player_id).await {
+        Ok(true) => {}
+        Ok(false) => return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": "Unknown player" }))).into_response(),
+        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
+
+    let row = sqlx::query!(
+        r#"INSERT INTO scores (id, game_id, user_id, round, value)
+           VALUES ($1, $2, $3, $4, $5)
+           ON CONFLICT ON CONSTRAINT scores_one_per_player_round
+           DO UPDATE SET value = EXCLUDED.value
+           RETURNING id, value"#,
+        Uuid::new_v4(),
+        game_id,
+        player_id,
+        round,
+        body.value,
+    )
+    .fetch_one(&state.db)
+    .await;
+
+    match row {
+        Ok(r) => {
+            state.broadcaster.notify(game_id, GameEvent::ScoresUpdated);
+            Json(serde_json::json!({ "id": r.id, "value": r.value })).into_response()
+        }
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
+}
+
+// DELETE /games/:id/rounds/last — undo the last saved round of an open game.
+pub async fn delete_last_round(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    Path(game_id): Path<Uuid>,
+) -> Response {
+    if !is_leader(&auth.role) {
+        return (StatusCode::FORBIDDEN, Json(serde_json::json!({ "error": "Only the leader can delete rounds" }))).into_response();
+    }
+
+    let mut tx = match state.db.begin().await {
+        Ok(tx) => tx,
+        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    };
+
+    // Lock the game row so a concurrent "save round" cannot interleave.
+    let game = sqlx::query!(
+        r#"SELECT status::TEXT AS "status!" FROM games WHERE id = $1 AND group_id = $2 FOR UPDATE"#,
+        game_id,
+        auth.group_id,
+    )
+    .fetch_optional(&mut *tx)
+    .await;
+
+    match game {
+        Ok(Some(g)) if g.status == "closed" => {
+            return (StatusCode::CONFLICT, Json(serde_json::json!({ "error": "Game is closed" }))).into_response();
+        }
+        Ok(Some(_)) => {}
+        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
+        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
+
+    let last = sqlx::query_scalar!("SELECT MAX(round) FROM scores WHERE game_id = $1", game_id)
+        .fetch_one(&mut *tx)
+        .await;
+    let last = match last {
+        Ok(Some(r)) => r,
+        Ok(None) => return (StatusCode::CONFLICT, Json(serde_json::json!({ "error": "No rounds to delete" }))).into_response(),
+        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    };
+
+    if sqlx::query!("DELETE FROM scores WHERE game_id = $1 AND round = $2", game_id, last)
+        .execute(&mut *tx)
+        .await
+        .is_err()
+        || sqlx::query!("UPDATE games SET current_round = $2 WHERE id = $1", game_id, last)
+            .execute(&mut *tx)
+            .await
+            .is_err()
+        || super::drafts::clear(&mut *tx, game_id).await.is_err()
+        || tx.commit().await.is_err()
+    {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    }
+
+    state.broadcaster.notify(game_id, GameEvent::ScoresUpdated);
+    Json(serde_json::json!({ "deleted_round": last })).into_response()
 }
